@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Sun, Moon, Bell, Shield, User, Key, Check } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
+import { useTheme } from '../../context/ThemeContext'
 
 function SettingRow({ icon: Icon, title, description, children }) {
   return (

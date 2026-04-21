@@ -2,7 +2,7 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { generateUserData, generateRevenueData, formatCurrency } from '../utils/mockData'
+import { generateUserData, generateRevenueData, formatCurrency } from '../../utils/mockData'
 
 const userData = generateUserData(12)
 const revenueData = generateRevenueData(30)

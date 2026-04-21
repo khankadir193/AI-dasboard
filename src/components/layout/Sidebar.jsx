@@ -14,7 +14,7 @@ const navItems = [
   { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard'   },
   { to: '/analytics',   icon: BarChart3,        label: 'Analytics'   },
   { to: '/ai-insights', icon: Sparkles,         label: 'AI Insights' },
-  { to: '/data',        icon: Table2,           label: 'Data Table'  },
+  { to: '/data-table',  icon: Table2,           label: 'Data Table'  },
   { to: '/settings',    icon: Settings,         label: 'Settings'    },
 ]
 

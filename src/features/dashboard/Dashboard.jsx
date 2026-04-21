@@ -3,9 +3,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import KPICard from '../components/ui/KPICard'
-import { generateRevenueData, generateCategoryData, formatCurrency } from '../utils/mockData'
-import { useTodos } from '../hooks/useFetch'
+import KPICard from '../../components/ui/KPICard'
+import { generateRevenueData, generateCategoryData, formatCurrency } from '../../utils/mockData'
+import { useTodos } from '../../hooks/useFetch'
 
 const revenueData = generateRevenueData(14)
 const categoryData = generateCategoryData()

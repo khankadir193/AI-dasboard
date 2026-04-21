@@ -1,25 +1,17 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import App from './App.jsx'
+import { RouterProvider } from 'react-router-dom'
+import { Providers } from './app/providers.jsx'
+import { router } from './app/router.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
-import './index.css'
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-})
+import './styles/index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
+    <Providers>
       <ThemeProvider>
-        <App />
+        <RouterProvider router={router} />
       </ThemeProvider>
-    </QueryClientProvider>
+    </Providers>
   </React.StrictMode>
 )

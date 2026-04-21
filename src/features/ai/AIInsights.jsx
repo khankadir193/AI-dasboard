@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
-import { getAIInsight } from '../services/aiService';
+import { getAIInsight } from '../../lib/apiClient';
 
 const SAMPLE_PROMPTS = [
   'Analyze my revenue trend: Q1=$42k, Q2=$38k, Q3=$51k, Q4=$67k. What are the key takeaways?',

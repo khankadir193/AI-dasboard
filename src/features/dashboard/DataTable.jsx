@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
-import { useUsers } from '../hooks/useFetch'
+import { useUsers } from '../../hooks/useFetch'
 
 const PAGE_SIZE = 5
 

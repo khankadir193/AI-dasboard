@@ -1,12 +1,12 @@
 import { Menu, Bell, Sun, Moon, Search } from 'lucide-react'
-import { useTheme } from '../context/ThemeContext'
+import { useTheme } from '../../context/ThemeContext'
 import { useLocation } from 'react-router-dom'
 
 const pageTitles = {
-  '/dashboard':   { title: 'Dashboard',    subtitle: 'Welcome back, John 👋' },
+  '/dashboard':   { title: 'Dashboard',    subtitle: 'Welcome back, John Doe' },
   '/analytics':   { title: 'Analytics',    subtitle: 'Deep dive into your metrics' },
   '/ai-insights': { title: 'AI Insights',  subtitle: 'Powered by GPT-4' },
-  '/data':        { title: 'Data Table',   subtitle: 'Manage and explore your data' },
+  '/data-table':  { title: 'Data Table',   subtitle: 'Manage and explore your data' },
   '/settings':    { title: 'Settings',     subtitle: 'Manage your preferences' },
 }
 
