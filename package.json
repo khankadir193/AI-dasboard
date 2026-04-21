@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "vite",
+    "dev:backend": "nodemon backend/server.js",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -12,7 +14,10 @@
     "@tanstack/react-query": "^5.24.0",
     "axios": "^1.6.7",
     "clsx": "^2.1.0",
+    "cors": "^2.8.6",
     "date-fns": "^3.3.1",
+    "dotenv": "^17.4.2",
+    "groq-sdk": "^1.1.2",
     "lucide-react": "^0.344.0",
     "openai": "^4.104.0",
     "react": "^18.2.0",
@@ -23,6 +28,9 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.18",
+    "concurrently": "^9.2.1",
+    "express": "^5.2.1",
+    "nodemon": "^3.1.14",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.4"

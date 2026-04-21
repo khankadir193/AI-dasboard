@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, Loader2, Copy, Check, RefreshCw, AlertCircle } from 'lucide-react';
+import { Sparkles, Send, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
 import { getAIInsight } from '../services/aiService';
 
 const SAMPLE_PROMPTS = [
@@ -83,7 +83,7 @@ export default function AIInsights() {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll to bottom of messages
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
@@ -104,7 +104,7 @@ export default function AIInsights() {
       setError(err.message);
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: `⚠️ **Error**: ${err.message}\n\nPlease check your API key in the \`.env\` file or try again later.` },
+        { role: 'assistant', content: `⚠️ **Error**: ${err.message}\n\nBackend proxy unavailable—using mock responses.` },
       ]);
     } finally {
       setLoading(false);
@@ -117,11 +117,9 @@ export default function AIInsights() {
     setError(null);
   };
 
-  const hasApiKey = import.meta.env.VITE_GROQ_API_KEY;
-
   return (
     <div className="max-w-3xl mx-auto space-y-4 p-4">
-      {/* Header card */}
+      {/* Header */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
@@ -129,11 +127,7 @@ export default function AIInsights() {
           </div>
           <div className="flex-1">
             <h2 className="font-semibold text-gray-900 dark:text-white">AI Data Analyst</h2>
-            <p className="text-sm text-gray-500">
-              {hasApiKey 
-                ? 'Powered by Groq AI — instant insights from your data' 
-                : 'Demo mode — Add your Groq API key for live AI responses'}
-            </p>
+            <p className="text-sm text-gray-500">Powered by secure backend proxy & Groq AI — instant insights from your data 🔒</p>
           </div>
           {messages.length > 0 && (
             <button 
@@ -144,12 +138,6 @@ export default function AIInsights() {
             </button>
           )}
         </div>
-        {!hasApiKey && (
-          <div className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-lg flex items-center gap-2">
-            <AlertCircle size={14} />
-            Add <code className="bg-amber-100 dark:bg-amber-900/50 px-1 rounded">VITE_GROQ_API_KEY=your_key_here</code> to .env file
-          </div>
-        )}
       </div>
 
       {/* Conversation */}
@@ -180,9 +168,9 @@ export default function AIInsights() {
               </div>
               <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl rounded-tl-sm p-4 flex items-center gap-2 text-sm text-gray-500">
                 <span className="inline-flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
                 </span>
                 Analyzing your data...
               </div>
@@ -192,7 +180,7 @@ export default function AIInsights() {
         </div>
       )}
 
-      {/* Input Box */}
+      {/* Input */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 sticky bottom-4">
         <div className="flex gap-3 items-end">
           <textarea
@@ -217,7 +205,7 @@ export default function AIInsights() {
           </button>
         </div>
         <p className="text-xs text-gray-400 mt-2 px-1">
-          💡 Get your free API key at <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">console.groq.com</a>
+          💡 Backend powered by Vercel serverless functions with Groq AI
         </p>
       </div>
     </div>

@@ -10,8 +10,8 @@ A production-grade analytics dashboard built with **React**, **JavaScript**, and
 ## ✨ Features
 
 - **📊 Dashboard** — KPI cards, area charts, pie charts, and live REST API data
-- **📈 Analytics** — Multi-chart analytics with user growth and revenue vs expenses
-- **🤖 AI Insights** — Chat interface powered by OpenAI GPT-3.5 for data analysis
+- **📈 Analytics** — Multi-chart analytics with user growth and revenue vs expenses  
+- **🤖 AI Insights** — Chat interface powered by **secure backend proxy** → Groq AI
 - **🗃️ Data Table** — Sortable, filterable, paginated table with live API data
 - **🌙 Dark Mode** — Persistent dark/light theme toggle
 - **📱 Responsive** — Mobile-first design with collapsible sidebar
@@ -30,7 +30,8 @@ A production-grade analytics dashboard built with **React**, **JavaScript**, and
 | Tailwind CSS | Utility-first styling |
 | Axios | HTTP client |
 | Lucide React | Icons |
-| OpenAI API | AI-powered insights |
+| **Vercel Serverless** | Secure backend API proxy |
+| **Groq AI** | Ultra-fast LLM inference |
 | Vite | Build tool |
 
 ---
@@ -44,22 +45,30 @@ cd ai-saas-dashboard
 npm install
 ```
 
-### 2. Configure Environment
+### 2. Backend Setup (Serverless)
+API key **never** exposed to frontend:
+```
+# Backend (.env or Vercel dashboard)
+GROQ_API_KEY=your_groq_key_here
+```
+
+### 3. Run Development Server (Local Fullstack)
 ```bash
+# Copy & set API key
 cp .env.example .env
-```
+# Edit .env: GROQ_API_KEY=your_key
 
-Edit `.env` and add your OpenAI API key (optional — works without it using mock responses):
-```
-VITE_OPENAI_API_KEY=sk-your-key-here
-```
-
-### 3. Run Development Server
-```bash
+# Start frontend + backend
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
+Frontend: http://localhost:5173  
+Backend: http://localhost:3001/api/chat (proxied)
+
+**Scripts:**
+- `npm run dev:frontend` — Vite only (mocks)
+- `npm run dev:backend` — Backend server
+- `npm run dev` — Both concurrently
 
 ### 4. Build for Production
 ```bash
@@ -73,93 +82,79 @@ npm run preview
 
 ```
 src/
-├── components/
-│   ├── Layout.jsx         # App shell (sidebar + header)
-│   ├── Sidebar.jsx        # Navigation sidebar
-│   ├── Header.jsx         # Top header with search & theme toggle
-│   └── ui/
-│       └── KPICard.jsx    # Reusable KPI metric card
-├── pages/
-│   ├── Dashboard.jsx      # Main dashboard with charts & live API
-│   ├── Analytics.jsx      # Detailed analytics charts
-│   ├── AIInsights.jsx     # AI-powered chat interface
-│   ├── DataTable.jsx      # Sortable/filterable data table
-│   └── Settings.jsx       # User preferences
-├── context/
-│   └── ThemeContext.jsx   # Dark/light mode state
-├── hooks/
-│   └── useFetch.js        # Custom React Query hooks
-├── services/
-│   └── aiService.js       # OpenAI API integration
-└── utils/
-    └── mockData.js        # Chart data generators & formatters
+├── components/    # UI components
+├── pages/         # Route pages
+├── services/      # API services
+│   └── aiService.js  # Secure backend proxy
+backend/
+└── api/           # Vercel serverless functions
+    └── chat.js    # Groq AI proxy 🔒
 ```
 
 ---
 
 ## 🔑 Key Implementation Highlights
 
-### Custom Data Fetching Hook
+### Secure Serverless API Architecture
+**Implemented secure serverless API architecture using Vercel Functions to protect API keys and prevent client-side exposure.**
+
 ```js
-// hooks/useFetch.js
-export function useFetch(key, url, options = {}) {
-  return useQuery({
-    queryKey: [key],
-    queryFn: async () => {
-      const { data } = await api.get(url)
-      return data
-    },
-    ...options,
-  })
-}
+// Frontend (safe)
+const data = await fetch('/api/chat', { method: 'POST', body: JSON.stringify({message}) })
+
+// Backend (secret key)
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 ```
 
-### AI Integration
+### Custom Proxy Service
 ```js
-// services/aiService.js
+// services/aiService.js  
 export async function getAIInsight(prompt) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch('/api/chat', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({ model: 'gpt-3.5-turbo', messages: [...] }),
+    body: JSON.stringify({ message: systemPrompt + prompt })
   })
-  // ...
+  return response.reply  // Backend hides Groq key
 }
 ```
 
 ---
 
-## 🌐 Deployment
-
-This app is deployed on **Vercel**. To deploy your own:
+## 🌐 Deployment (Vercel Recommended)
 
 ```bash
 npm i -g vercel
 vercel --prod
 ```
 
-Add `VITE_OPENAI_API_KEY` in your Vercel dashboard under Environment Variables.
+**Vercel Dashboard** → Settings → Environment Variables:
+```
+GROQ_API_KEY = gsk_your_key_here
+```
+
+**Remove** any `VITE_GROQ_API_KEY` vars.
 
 ---
 
-## 🧪 What I Learned / Challenges
+## 🧪 Challenges Overcome
 
-See [CHALLENGES.md](./CHALLENGES.md) for a detailed write-up on:
-- Managing server state with React Query vs local state
-- Implementing a scalable dark mode with Tailwind's `class` strategy
-- Handling OpenAI API errors gracefully with fallback mock responses
-- Building a reusable, accessible data table from scratch
+See [CHALLENGES.md](./CHALLENGES.md)
+
+- Migrated from direct client-side AI calls to secure backend proxy
+- Graceful fallback to mocks during dev
+- Maintained identical UX while improving security
 
 ---
 
 ## 📸 Screenshots
 
-| Dashboard | AI Insights | Data Table |
+| Dashboard | **Secure AI Insights** | Data Table |
 |---|---|---|
-| ![Dashboard](#) | ![AI Insights](#) | ![Table](#) |
+| ![Dashboard](#) | ![AI](#) | ![Table](#) |
 
 ---
 
 ## 📄 License
 
-MIT — feel free to fork and use as a portfolio project.
+MIT — perfect portfolio project.
+
