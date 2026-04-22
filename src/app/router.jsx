@@ -7,6 +7,8 @@ const loadAnalytics = () => import('../features/analytics/Analytics.jsx');
 const loadAIInsights = () => import('../features/ai/AIInsights.jsx');
 const loadDataTable = () => import('../features/dashboard/DataTable.jsx');
 const loadSettings = () => import('../features/organization/Settings.jsx');
+const loadSignup = () => import('../features/auth/Signup.jsx');
+const loadLogin = () => import('../features/auth/Login.jsx');
 
 export const router = createBrowserRouter([
   {
@@ -50,6 +52,20 @@ export const router = createBrowserRouter([
         lazy: async () => {
           const { default: Settings } = await loadSettings();
           return { Component: Settings };
+        },
+      },
+      {
+        path: 'signup',
+        lazy: async () => {
+          const { default: Signup } = await loadSignup();
+          return { Component: Signup };
+        },
+      },
+      {
+        path: 'login',
+        lazy: async () => {
+          const { default: Login } = await loadLogin();
+          return { Component: Login };
         },
       },
     ],

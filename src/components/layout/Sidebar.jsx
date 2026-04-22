@@ -7,15 +7,22 @@ import {
   Settings,
   Zap,
   X,
+  Lock,
+  Building2,
 } from 'lucide-react'
 import clsx from 'clsx'
 
 const navItems = [
-  { to: '/dashboard',   icon: LayoutDashboard, label: 'Dashboard'   },
-  { to: '/analytics',   icon: BarChart3,        label: 'Analytics'   },
+  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard'   },
+  { to: '/analytics',  icon: BarChart3,        label: 'Analytics'   },
   { to: '/ai-insights', icon: Sparkles,         label: 'AI Insights' },
   { to: '/data-table',  icon: Table2,           label: 'Data Table'  },
   { to: '/settings',    icon: Settings,         label: 'Settings'    },
+]
+
+const authItems = [
+  { to: '/login',     icon: Lock,             label: 'Sign In'    },
+  { to: '/signup',    icon: Building2,        label: 'Sign Up'    },
 ]
 
 export default function Sidebar({ open, onClose }) {
@@ -78,6 +85,25 @@ export default function Sidebar({ open, onClose }) {
               <p className="text-xs text-gray-500 truncate">john@example.com</p>
             </div>
           </div>
+        </div>
+
+        {/* Auth links */}
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">
+            Account
+          </p>
+          {authItems.map(({ to, icon: Icon, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                clsx('sidebar-link', isActive && 'active')
+              }
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+            </NavLink>
+          ))}
         </div>
       </aside>
     </>
