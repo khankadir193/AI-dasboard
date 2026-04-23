@@ -51,7 +51,8 @@ export default function Signup() {
 
       if (error) throw error
 
-      const user = data.user
+      // const user = data.user
+      const user = data?.user || data?.session?.user
 
       if (!user) {
         setErrors({ general: "Please check your email for confirmation link" })
@@ -65,7 +66,7 @@ export default function Signup() {
         .select()
         .single()
 
-      if (companyError) throw companyError
+      if (companyError || !company) throw companyError || new Error("Company creation failed")
 
       // Step 3 → Create profile
       const { error: profileError } = await supabase
