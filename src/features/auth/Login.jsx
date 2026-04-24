@@ -1,15 +1,32 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { supabase } from "../../lib/supabaseClient"
+import { useSelector, useDispatch } from "react-redux"
+import { signIn, clearError } from "../../store/slices/authSlice"
 import { Building2, Mail, Lock, Loader2, Eye, EyeOff } from "lucide-react"
 
 export default function Login() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState({})
   const navigate = useNavigate()
+  const dispatch = useDispatch()
+  
+  const { isAuthenticated, isLoading, error: authError } = useSelector((state) => state.auth)
+
+  useEffect(() => {
+    // If user is already authenticated, redirect to dashboard
+    if (isAuthenticated) {
+      navigate("/dashboard", { replace: true })
+    }
+  }, [isAuthenticated, navigate])
+
+  useEffect(() => {
+    // Clear Redux errors when component unmounts
+    return () => {
+      dispatch(clearError())
+    }
+  }, [dispatch])
 
   const validateForm = () => {
     const newErrors = {}
@@ -33,24 +50,19 @@ export default function Login() {
     
     if (!validateForm()) return
     
-    setLoading(true)
-
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-
-      if (error) throw error
-
-      // Success - redirect to dashboard
-      navigate("/dashboard")
-
+      const result = await dispatch(signIn({ email, password }))
+      
+      if (result.meta.requestStatus === 'fulfilled') {
+        // Success - redirect to dashboard
+        navigate("/dashboard")
+      } else {
+        // Error is handled in Redux state
+        setErrors({ general: result.payload || "Login failed. Please try again." })
+      }
     } catch (err) {
       console.error("Login error:", err)
-      setErrors({ general: err.message || "Login failed. Please check your credentials." })
-    } finally {
-      setLoading(false)
+      setErrors({ general: err.message || "Login failed. Please try again." })
     }
   }
 
@@ -71,9 +83,11 @@ export default function Login() {
 
         <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleLogin}>
-            {errors.general && (
+            {(errors.general || authError) && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
-                <div className="text-sm text-red-600 dark:text-red-400">{errors.general}</div>
+                <div className="text-sm text-red-600 dark:text-red-400">
+                  {errors.general || authError}
+                </div>
               </div>
             )}
 
@@ -163,10 +177,10 @@ export default function Login() {
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isLoading}
                 className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? (
+                {isLoading ? (
                   <Loader2 className="animate-spin h-5 w-5" />
                 ) : (
                   "Sign in"

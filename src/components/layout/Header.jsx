@@ -1,19 +1,28 @@
 import { Menu, Bell, Sun, Moon, Search } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 
 const pageTitles = {
   '/dashboard':   { title: 'Dashboard',    subtitle: 'Welcome back, John Doe' },
-  '/analytics':   { title: 'Analytics',    subtitle: 'Deep dive into your metrics' },
-  '/ai-insights': { title: 'AI Insights',  subtitle: 'Powered by GPT-4' },
-  '/data-table':  { title: 'Data Table',   subtitle: 'Manage and explore your data' },
-  '/settings':    { title: 'Settings',     subtitle: 'Manage your preferences' },
+  '/dashboard/analytics':   { title: 'Analytics',    subtitle: 'Deep dive into your metrics' },
+  '/dashboard/ai-insights': { title: 'AI Insights',  subtitle: 'Powered by GPT-4' },
+  '/dashboard/data-table':  { title: 'Data Table',   subtitle: 'Manage and explore your data' },
+  '/dashboard/settings':    { title: 'Settings',     subtitle: 'Manage your preferences' },
 }
 
 export default function Header({ onMenuClick }) {
   const { theme, toggleTheme } = useTheme()
+  const { displayName, signOut, isSigningOut } = useAuth()
+  const navigate = useNavigate()
   const { pathname } = useLocation()
   const page = pageTitles[pathname] || { title: 'Dashboard', subtitle: '' }
+  const subtitle = pathname === '/dashboard' ? `Welcome back, ${displayName}` : page.subtitle
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/signin', { replace: true })
+  }
 
   return (
     <header className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-6 py-4 flex items-center gap-4">
@@ -26,7 +35,7 @@ export default function Header({ onMenuClick }) {
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white leading-none">
           {page.title}
         </h1>
-        <p className="text-sm text-gray-500 mt-0.5">{page.subtitle}</p>
+        <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
       </div>
 
       {/* Search */}
@@ -47,6 +56,13 @@ export default function Header({ onMenuClick }) {
         <button className="btn-ghost p-2 relative">
           <Bell size={18} />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+        </button>
+        <button
+          onClick={handleSignOut}
+          disabled={isSigningOut}
+          className="ml-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-60"
+        >
+          {isSigningOut ? 'Signing out...' : 'Sign out'}
         </button>
       </div>
     </header>
