@@ -9,6 +9,7 @@ import {
   X,
   Lock,
   Building2,
+  FolderKanban,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../context/AuthContext'
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/dashboard/analytics',  icon: BarChart3,        label: 'Analytics'   },
   { to: '/dashboard/ai-insights', icon: Sparkles,         label: 'AI Insights' },
   { to: '/dashboard/data-table',  icon: Table2,           label: 'Data Table'  },
+  { to: '/dashboard/projects',    icon: FolderKanban,    label: 'Projects'    },
   { to: '/dashboard/settings',    icon: Settings,         label: 'Settings'    },
 ]
 

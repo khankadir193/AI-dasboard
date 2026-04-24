@@ -72,11 +72,11 @@ export default function Dashboard() {
 
         const { data: company, error: companyError } = await supabase
           .from('companies')
-          .select('trial_end')
+          .select('id, name, created_at')
           .eq('id', profile.company_id)
           .single()
 
-        if (companyError || !company?.trial_end) {
+        if (companyError || !company?.created_at) {
           setTrialInfo({
             isLoading: false,
             trialEnd: null,
@@ -86,14 +86,16 @@ export default function Dashboard() {
           return
         }
 
+        // Calculate trial period based on company creation date (30-day trial)
         const now = new Date()
-        const trialEndDate = new Date(company.trial_end)
+        const createdDate = new Date(company.created_at)
+        const trialEndDate = new Date(createdDate.getTime() + (30 * 24 * 60 * 60 * 1000)) // 30 days from creation
         const diffMs = trialEndDate.getTime() - now.getTime()
         const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
 
         setTrialInfo({
           isLoading: false,
-          trialEnd: company.trial_end,
+          trialEnd: trialEndDate,
           daysLeft: Math.max(daysLeft, 0),
           isExpired: diffMs <= 0,
         })

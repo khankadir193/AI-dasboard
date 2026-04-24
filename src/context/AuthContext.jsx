@@ -1,10 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useDispatch } from 'react-redux'
 import { supabase } from '../lib/supabaseClient'
+import { setUserProfile } from '../store/slices/authSlice'
 
 const AuthContext = createContext(null)
 const AUTH_TIMEOUT_MS = 6000
 
 export function AuthProvider({ children }) {
+  const dispatch = useDispatch()
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -45,10 +48,14 @@ export function AuthProvider({ children }) {
     const fetchProfile = async (userId) => {
       if (!userId) return null
       const { data, error } = await withTimeout(
-        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+        supabase.from('profiles').select("*, companies(*)").eq('id', userId).maybeSingle(),
         { data: null, error: new Error('Profile fetch timeout') }
       )
       if (error) return null
+      if (data) {
+        // Dispatch to Redux for global state management
+        dispatch(setUserProfile(data))
+      }
       return data
     }
 

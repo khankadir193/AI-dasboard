@@ -8,6 +8,7 @@ const loadAnalytics = () => import('../features/analytics/Analytics.jsx');
 const loadAIInsights = () => import('../features/ai/AIInsights.jsx');
 const loadDataTable = () => import('../features/dashboard/DataTable.jsx');
 const loadSettings = () => import('../features/organization/Settings.jsx');
+const loadProjects = () => import('../features/projects/Projects.jsx');
 const loadSignup = () => import('../features/auth/Signup.jsx');
 const loadLogin = () => import('../features/auth/Login.jsx');
 
@@ -86,6 +87,19 @@ export const router = createBrowserRouter([
             Component: () => (
               <ProtectedRoute>
                 <DataTable />
+              </ProtectedRoute>
+            )
+          };
+        },
+      },
+      {
+        path: 'projects',
+        lazy: async () => {
+          const { default: Projects } = await loadProjects();
+          return { 
+            Component: () => (
+              <ProtectedRoute>
+                <Projects />
               </ProtectedRoute>
             )
           };

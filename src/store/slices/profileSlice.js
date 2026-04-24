@@ -8,21 +8,13 @@ export const fetchUserProfile = createAsyncThunk(
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          company:company_id (*)
-        `)
+        .select("*, companies(*)")
         .eq('id', userId)
         .single()
 
       if (error) throw error
       
-      // Normalize the data structure
-      return {
-        ...data,
-        tenant_id: data.company_id,
-        tenant: data.company
-      }
+      return data
     } catch (error) {
       return rejectWithValue(error.message)
     }

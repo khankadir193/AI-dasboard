@@ -85,6 +85,17 @@ export function CanDeleteData({ children, fallback }) {
   )
 }
 
+export function CanDeleteProject({ children, fallback }) {
+  return (
+    <RoleBasedAccess 
+      permissions={['delete_data']} 
+      fallback={fallback}
+    >
+      {children}
+    </RoleBasedAccess>
+  )
+}
+
 export function AdminOnly({ children, fallback }) {
   return (
     <RoleBasedAccess 

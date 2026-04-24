@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS data_tables (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Projects table with tenant isolation
+CREATE TABLE IF NOT EXISTS projects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'archived')),
+    description TEXT,
+    created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Enable RLS on all tables
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -78,6 +90,7 @@ ALTER TABLE analytics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kpis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_insights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE data_tables ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for Tenants table
 CREATE POLICY "Tenants are viewable by authenticated users" ON tenants
@@ -192,12 +205,55 @@ CREATE POLICY "Users can delete their own data tables" ON data_tables
         auth.jwt() ->> 'role' IN ('admin', 'user')
     );
 
+-- RLS Policies for Projects table
+CREATE POLICY "Users can view their company projects" ON projects
+    FOR SELECT USING (
+        company_id IN (
+            SELECT company_id FROM profiles WHERE id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert their company projects" ON projects
+    FOR INSERT WITH CHECK (
+        company_id IN (
+            SELECT company_id FROM profiles WHERE id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update their own projects" ON projects
+    FOR UPDATE USING (
+        auth.uid() = created_by::text
+    );
+
+CREATE POLICY "Admins can update company projects" ON projects
+    FOR UPDATE USING (
+        company_id IN (
+            SELECT company_id FROM profiles WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+CREATE POLICY "Users can delete their own projects" ON projects
+    FOR DELETE USING (
+        auth.uid() = created_by::text AND
+        EXISTS (
+            SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'user')
+        )
+    );
+
+CREATE POLICY "Admins can delete company projects" ON projects
+    FOR DELETE USING (
+        company_id IN (
+            SELECT company_id FROM profiles WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
 -- Create indexes for better performance
 CREATE INDEX idx_profiles_tenant_id ON profiles(tenant_id);
 CREATE INDEX idx_analytics_tenant_id ON analytics(tenant_id);
 CREATE INDEX idx_kpis_tenant_id ON kpis(tenant_id);
 CREATE INDEX idx_ai_insights_tenant_id ON ai_insights(tenant_id);
 CREATE INDEX idx_data_tables_tenant_id ON data_tables(tenant_id);
+CREATE INDEX idx_projects_company_id ON projects(company_id);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -222,4 +278,7 @@ CREATE TRIGGER update_kpis_updated_at BEFORE UPDATE ON kpis
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_data_tables_updated_at BEFORE UPDATE ON data_tables
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

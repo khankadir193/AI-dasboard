@@ -4,6 +4,7 @@ import Dashboard from '../features/dashboard/Dashboard.jsx'
 import Analytics from '../features/analytics/Analytics.jsx'
 import AIInsights from '../features/ai/AIInsights.jsx'
 import DataTable from '../features/dashboard/DataTable.jsx'
+import Projects from '../features/projects/Projects.jsx'
 import Settings from '../features/organization/Settings.jsx'
 import SignIn from '../features/auth/SignIn.jsx'
 import SignUp from '../features/auth/Signup.jsx'
@@ -85,6 +86,7 @@ export default function App() {
         <Route path="analytics" element={<Analytics />} />
         <Route path="ai-insights" element={<AIInsights />} />
         <Route path="data-table" element={<DataTable />} />
+        <Route path="projects" element={<Projects />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 
