@@ -45,11 +45,11 @@ class AnalyticsApiService {
   async fetchRevenueData(dateRange = 30) {
     const data = await this.fetchAnalyticsData('revenue', dateRange)
     return data.map(item => ({
-      date: new Date(item.metric_date).toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
+      date: new Date(item.metric_date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
       }),
-      revenue: parseFloat(item.metric_value),
+      revenue: parseFloat(item.metric_value ?? 0),
       fullDate: item.metric_date
     }))
   }
@@ -58,11 +58,11 @@ class AnalyticsApiService {
   async fetchUsersData(dateRange = 30) {
     const data = await this.fetchAnalyticsData('users', dateRange)
     return data.map(item => ({
-      date: new Date(item.metric_date).toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
+      date: new Date(item.metric_date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
       }),
-      users: parseInt(item.metric_value),
+      users: parseInt(item.metric_value ?? 0),
       fullDate: item.metric_date
     }))
   }
@@ -137,16 +137,16 @@ class AnalyticsApiService {
       data?.forEach(item => {
         switch (item.metric_type) {
           case 'revenue':
-            kpis.totalRevenue += parseFloat(item.metric_value)
+            kpis.totalRevenue += parseFloat(item.metric_value ?? 0)
             break
           case 'users':
-            kpis.activeUsers = Math.max(kpis.activeUsers, parseInt(item.metric_value))
+            kpis.activeUsers = Math.max(kpis.activeUsers, parseInt(item.metric_value ?? 0))
             break
           case 'conversion_rate':
-            kpis.conversionRate = parseFloat(item.metric_value)
+            kpis.conversionRate = parseFloat(item.metric_value ?? 0)
             break
           case 'orders':
-            kpis.newOrders += parseInt(item.metric_value)
+            kpis.newOrders += parseInt(item.metric_value ?? 0)
             break
         }
       })
