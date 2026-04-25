@@ -27,7 +27,7 @@ export const updateTenantSettings = createAsyncThunk(
   async ({ tenantId, settings }, { rejectWithValue }) => {
     try {
       const { data, error } = await supabase
-        .from('tenants')
+        .from('companies')
         .update({ settings })
         .eq('id', tenantId)
         .select()
@@ -53,7 +53,7 @@ export const fetchTenantUsers = createAsyncThunk(
           *,
           user_auth:auth.users!inner(email, created_at)
         `)
-        .eq('tenant_id', tenantId)
+        .eq('company_id', tenantId)
 
       if (error) throw error
       

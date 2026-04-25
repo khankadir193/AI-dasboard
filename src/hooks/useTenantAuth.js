@@ -18,9 +18,9 @@ export function useTenantAuth() {
   }, [isAuthenticated, user, profile, dispatch])
 
   useEffect(() => {
-    if (profile && profile.tenant_id && !currentTenant) {
+    if (profile && profile.company_id && !currentTenant) {
       // Fetch tenant details when profile is loaded but tenant not loaded
-      dispatch(fetchTenantDetails(profile.tenant_id))
+      dispatch(fetchTenantDetails(profile.company_id))
     }
   }, [profile, currentTenant, dispatch])
 

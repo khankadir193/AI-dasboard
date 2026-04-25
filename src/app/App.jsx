@@ -22,28 +22,43 @@ function FullScreenLoader() {
 }
 
 function PrivateRoute({ children }) {
-  const { session, isLoading } = useAuth()
+  try {
+    const { session, isLoading } = useAuth()
 
-  if (isLoading) return <FullScreenLoader />
-  if (!session) return <Navigate to="/signin" replace />
+    if (isLoading) return <FullScreenLoader />
+    if (!session) return <Navigate to="/signin" replace />
 
-  return children
+    return children
+  } catch (error) {
+    console.error('PrivateRoute error:', error)
+    return <Navigate to="/signin" replace />
+  }
 }
 
 function PublicOnlyRoute({ children }) {
-  const { session, isLoading } = useAuth()
+  try {
+    const { session, isLoading } = useAuth()
 
-  if (isLoading) return <FullScreenLoader />
-  if (session) return <Navigate to="/dashboard" replace />
+    if (isLoading) return <FullScreenLoader />
+    if (session) return <Navigate to="/dashboard" replace />
 
-  return children
+    return children
+  } catch (error) {
+    console.error('PublicOnlyRoute error:', error)
+    return children // Allow access on error to prevent infinite redirects
+  }
 }
 
 function RootRedirect() {
-  const { session, isLoading } = useAuth()
+  try {
+    const { session, isLoading } = useAuth()
 
-  if (isLoading) return <FullScreenLoader />
-  return <Navigate to={session ? '/dashboard' : '/signin'} replace />
+    if (isLoading) return <FullScreenLoader />
+    return <Navigate to={session ? '/dashboard' : '/signin'} replace />
+  } catch (error) {
+    console.error('RootRedirect error:', error)
+    return <Navigate to="/signin" replace />
+  }
 }
 
 function ProtectedLayout() {

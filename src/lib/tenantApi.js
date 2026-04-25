@@ -19,10 +19,10 @@ class TenantApiService {
   // Generic method to add tenant filter to any query
   addTenantFilter(query, tableName) {
     if (!this.currentTenantId) {
-      throw new Error('Tenant ID not set. Please authenticate first.')
+      throw new Error('Company ID not set. Please authenticate first.')
     }
     
-    return query.eq('tenant_id', this.currentTenantId)
+    return query.eq('company_id', this.currentTenantId)
   }
 
   // Analytics API methods
@@ -262,11 +262,11 @@ class TenantApiService {
 
   async updateTenantSettings(settings) {
     if (!this.currentTenantId) {
-      throw new Error('Tenant ID not set')
+      throw new Error('Company ID not set')
     }
 
     const { data, error } = await supabase
-      .from('tenants')
+      .from('companies')
       .update({ settings })
       .eq('id', this.currentTenantId)
       .select()
