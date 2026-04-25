@@ -282,3 +282,56 @@ CREATE TRIGGER update_data_tables_updated_at BEFORE UPDATE ON data_tables
 
 CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Analytics data table for dashboard metrics
+CREATE TABLE IF NOT EXISTS analytics_data (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
+    metric_type TEXT NOT NULL CHECK (metric_type IN ('revenue', 'users', 'projects', 'conversion_rate', 'orders')),
+    metric_value NUMERIC NOT NULL,
+    metric_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS on analytics_data table
+ALTER TABLE analytics_data ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for analytics_data table
+CREATE POLICY "Users can view their company analytics data" ON analytics_data
+    FOR SELECT USING (
+        company_id IN (
+            SELECT company_id FROM profiles WHERE id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert their company analytics data" ON analytics_data
+    FOR INSERT WITH CHECK (
+        company_id IN (
+            SELECT company_id FROM profiles WHERE id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Admins can update company analytics data" ON analytics_data
+    FOR UPDATE USING (
+        company_id IN (
+            SELECT company_id FROM profiles WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+CREATE POLICY "Admins can delete company analytics data" ON analytics_data
+    FOR DELETE USING (
+        company_id IN (
+            SELECT company_id FROM profiles WHERE id = auth.uid() AND role = 'admin'
+        )
+    );
+
+-- Index for analytics_data
+CREATE INDEX idx_analytics_data_company_id ON analytics_data(company_id);
+CREATE INDEX idx_analytics_data_metric_type ON analytics_data(metric_type);
+CREATE INDEX idx_analytics_data_metric_date ON analytics_data(metric_date);
+
+-- Trigger for analytics_data
+CREATE TRIGGER update_analytics_data_updated_at BEFORE UPDATE ON analytics_data
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -3,16 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Users, DollarSign, TrendingUp, ShoppingCart } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line,
 } from 'recharts'
 import KPICard from '../../components/ui/KPICard'
-import { generateRevenueData, generateCategoryData, formatCurrency } from '../../utils/mockData'
+import { formatCurrency } from '../../utils/mockData'
 import { Loader2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
-
-const revenueData = generateRevenueData(14)
-const categoryData = generateCategoryData()
+import { analyticsApi } from '../../lib/analyticsApi'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -25,6 +23,21 @@ export default function Dashboard() {
     trialEnd: null,
     daysLeft: null,
     isExpired: false,
+  })
+  
+  // Analytics data state
+  const [analyticsData, setAnalyticsData] = useState({
+    revenueData: [],
+    usersData: [],
+    projectStatusData: [],
+    kpiData: {
+      totalRevenue: 0,
+      activeUsers: 0,
+      conversionRate: 0,
+      newOrders: 0
+    },
+    isLoading: true,
+    error: null
   })
 
   const tabs = [
@@ -112,8 +125,83 @@ export default function Dashboard() {
     fetchTrialInfo()
   }, [session])
 
+  // Analytics data fetching
+  const fetchAnalyticsData = async () => {
+    if (!session?.user?.id) return
+
+    try {
+      setAnalyticsData(prev => ({ ...prev, isLoading: true, error: null }))
+
+      // Get user profile to set company ID
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', session.user.id)
+        .single()
+
+      if (profileError || !profile?.company_id) {
+        throw new Error('Company not found')
+      }
+
+      // Set company ID in analytics API
+      analyticsApi.setCompanyId(profile.company_id)
+
+      // Fetch all analytics data in parallel
+      const [revenueData, usersData, projectStatusData, kpiData] = await Promise.all([
+        analyticsApi.fetchRevenueData(14).catch(() => []),
+        analyticsApi.fetchUsersData(14).catch(() => []),
+        analyticsApi.fetchProjectStatusData().catch(() => []),
+        analyticsApi.fetchKPIData().catch(() => ({
+          totalRevenue: 0,
+          activeUsers: 0,
+          conversionRate: 0,
+          newOrders: 0
+        }))
+      ])
+
+      setAnalyticsData({
+        revenueData,
+        usersData,
+        projectStatusData,
+        kpiData,
+        isLoading: false,
+        error: null
+      })
+
+      // Generate sample data if no data exists
+      if (revenueData.length === 0 && usersData.length === 0) {
+        try {
+          await analyticsApi.generateSampleData()
+          // Retry fetching after generating sample data
+          const [newRevenueData, newUsersData] = await Promise.all([
+            analyticsApi.fetchRevenueData(14),
+            analyticsApi.fetchUsersData(14)
+          ])
+          setAnalyticsData(prev => ({
+            ...prev,
+            revenueData: newRevenueData,
+            usersData: newUsersData
+          }))
+        } catch (sampleError) {
+          console.warn('Could not generate sample data:', sampleError)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching analytics data:', error)
+      setAnalyticsData(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.message
+      }))
+    }
+  }
+
   useEffect(() => {
-    // Simulate loading
+    fetchAnalyticsData()
+  }, [session])
+
+  useEffect(() => {
+    // Simulate loading for todos
     const timer = setTimeout(() => {
       setLoading(false)
       // Mock todos data
@@ -184,7 +272,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <KPICard
           title="Total Revenue"
-          value="$84,250"
+          value={formatCurrency(analyticsData.kpiData.totalRevenue)}
           change={12.5}
           changeLabel="vs last month"
           icon={DollarSign}
@@ -192,7 +280,7 @@ export default function Dashboard() {
         />
         <KPICard
           title="Active Users"
-          value="12,430"
+          value={analyticsData.kpiData.activeUsers.toLocaleString()}
           change={8.2}
           changeLabel="vs last month"
           icon={Users}
@@ -200,7 +288,7 @@ export default function Dashboard() {
         />
         <KPICard
           title="Conversion Rate"
-          value="3.6%"
+          value={`${analyticsData.kpiData.conversionRate}%`}
           change={-1.4}
           changeLabel="vs last month"
           icon={TrendingUp}
@@ -208,7 +296,7 @@ export default function Dashboard() {
         />
         <KPICard
           title="New Orders"
-          value="1,893"
+          value={analyticsData.kpiData.newOrders.toLocaleString()}
           change={5.7}
           changeLabel="vs last month"
           icon={ShoppingCart}
@@ -231,51 +319,126 @@ export default function Dashboard() {
               <option>Last 90 days</option>
             </select>
           </div>
-          <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={revenueData}>
-              <defs>
-                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-800" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-              <YAxis tickFormatter={v => `$${v / 1000}k`} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-              <Tooltip formatter={value => [formatCurrency(value), 'Revenue']} />
-              <Area type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} fill="url(#revGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
+          {analyticsData.isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
+            </div>
+          ) : analyticsData.error ? (
+            <div className="flex items-center justify-center h-64 text-red-600">
+              <p>Error loading revenue data</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={analyticsData.revenueData}>
+                <defs>
+                  <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-800" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={v => `$${v / 1000}k`} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                <Tooltip formatter={value => [formatCurrency(value), 'Revenue']} />
+                <Area type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} fill="url(#revGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
-        {/* Pie Chart */}
+        {/* Project Status Pie Chart */}
         <div className="card">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Revenue by Plan</h2>
-          <p className="text-sm text-gray-500 mb-4">This month</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={categoryData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
-                {categoryData.map((entry, index) => (
-                  <Cell key={index} fill={entry.fill} />
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Project Status</h2>
+          <p className="text-sm text-gray-500 mb-4">Current distribution</p>
+          {analyticsData.isLoading ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 className="animate-spin h-6 w-6 text-blue-600" />
+            </div>
+          ) : analyticsData.error ? (
+            <div className="flex items-center justify-center h-48 text-red-600">
+              <p>Error loading project data</p>
+            </div>
+          ) : analyticsData.projectStatusData.length === 0 ? (
+            <div className="flex items-center justify-center h-48 text-gray-500">
+              <p>No projects found</p>
+            </div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie 
+                    data={analyticsData.projectStatusData} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={55} 
+                    outerRadius={80} 
+                    paddingAngle={3} 
+                    dataKey="value"
+                  >
+                    {analyticsData.projectStatusData.map((entry, index) => (
+                      <Cell key={index} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={value => [value, 'Projects']} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2 mt-2">
+                {analyticsData.projectStatusData.map(item => (
+                  <div key={item.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">{item.name}</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {item.value}
+                    </span>
+                  </div>
                 ))}
-              </Pie>
-              <Tooltip formatter={value => [`$${value.toLocaleString()}`, 'Revenue']} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="space-y-2 mt-2">
-            {categoryData.map(item => (
-              <div key={item.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">{item.name}</span>
-                </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  ${item.value.toLocaleString()}
-                </span>
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
+      </div>
+
+      {/* Users Line Chart */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">User Growth</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Last 14 days</p>
+          </div>
+          <select className="text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-3 py-1.5 border-0 outline-none">
+            <option>Last 14 days</option>
+            <option>Last 30 days</option>
+            <option>Last 90 days</option>
+          </select>
+        </div>
+        {analyticsData.isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
+          </div>
+        ) : analyticsData.error ? (
+          <div className="flex items-center justify-center h-64 text-red-600">
+            <p>Error loading user data</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={analyticsData.usersData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" className="dark:stroke-gray-800" />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+              <Tooltip formatter={value => [value.toLocaleString(), 'Users']} />
+              <Line 
+                type="monotone" 
+                dataKey="users" 
+                stroke="#10b981" 
+                strokeWidth={2}
+                dot={{ fill: '#10b981', r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* Recent Tasks (from REST API) */}
