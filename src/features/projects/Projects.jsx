@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import { Plus, Trash2, Calendar, Activity, X } from 'lucide-react'
+import { Plus, Trash2, Calendar, Activity, X, Edit } from 'lucide-react'
 import { createProject, getProjects, deleteProject } from '../../lib/projectsApi'
-import { CanDeleteProject } from '../../components/auth/RoleBasedAccess'
+import { supabase } from '../../lib/supabaseClient'
 
 export default function Projects() {
   const dispatch = useDispatch()
@@ -14,6 +14,9 @@ export default function Projects() {
   const [newProjectName, setNewProjectName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [deletingProjectId, setDeletingProjectId] = useState(null)
+  const [editingProjectId, setEditingProjectId] = useState(null)
+  const [editProjectName, setEditProjectName] = useState('')
+  const [showEditModal, setShowEditModal] = useState(false)
   const [formError, setFormError] = useState('')
   const modalRef = useRef(null)
   const inputRef = useRef(null)
@@ -130,7 +133,12 @@ export default function Projects() {
 
     try {
       setDeletingProjectId(projectId)
-      await deleteProject(projectId)
+      const { error } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", projectId)
+      
+      if (error) throw error
       
       // Remove project from list with optimistic update
       setProjects(projects.filter(p => p.id !== projectId))
@@ -139,10 +147,66 @@ export default function Projects() {
       setError(null)
     } catch (error) {
       console.error('Failed to delete project:', error)
+      alert('Failed to delete project. Please try again.')
       setError(error.message || 'Failed to delete project. Please try again.')
     } finally {
       setDeletingProjectId(null)
     }
+  }
+
+  const handleEditProject = (project) => {
+    if (profile?.role !== "admin") {
+      alert('Only administrators can edit projects.')
+      return
+    }
+    setEditingProjectId(project.id)
+    setEditProjectName(project.name)
+    setShowEditModal(true)
+  }
+
+  const handleUpdateProject = async (e) => {
+    e.preventDefault()
+    
+    if (!editingProjectId || !editProjectName.trim()) {
+      setFormError('Project name is required')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      const { error } = await supabase
+        .from("projects")
+        .update({ name: editProjectName.trim() })
+        .eq("id", editingProjectId)
+      
+      if (error) throw error
+      
+      // Update project in list
+      setProjects(projects.map(p => 
+        p.id === editingProjectId 
+          ? { ...p, name: editProjectName.trim() }
+          : p
+      ))
+      
+      // Close modal and reset
+      setShowEditModal(false)
+      setEditProjectName('')
+      setEditingProjectId(null)
+      setFormError('')
+    } catch (error) {
+      console.error('Failed to update project:', error)
+      alert('Failed to update project. Please try again.')
+      setFormError(error.message || 'Failed to update project. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const closeEditModal = () => {
+    setShowEditModal(false)
+    setEditProjectName('')
+    setEditingProjectId(null)
+    setFormError('')
   }
 
   const formatDate = (dateString) => {
@@ -255,13 +319,22 @@ export default function Projects() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <CanDeleteProject fallback={null}>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleEditProject(project)}
+                          disabled={profile?.role !== "admin"}
+                          className={`text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+                          aria-label={`Edit project ${project.name}`}
+                          title={profile?.role === "admin" ? `Edit ${project.name}` : "Only administrators can edit projects"}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleDeleteProject(project.id)}
-                          disabled={deletingProjectId === project.id}
+                          disabled={profile?.role !== "admin" || deletingProjectId === project.id}
                           className={`text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                           aria-label={`Delete project ${project.name}`}
-                          title={`Delete ${project.name}`}
+                          title={profile?.role === "admin" ? `Delete ${project.name}` : "Only administrators can delete projects"}
                         >
                           {deletingProjectId === project.id ? (
                             <div className="animate-spin h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full"></div>
@@ -269,7 +342,7 @@ export default function Projects() {
                             <Trash2 className="h-4 w-4" />
                           )}
                         </button>
-                      </CanDeleteProject>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -379,6 +452,97 @@ export default function Projects() {
                     </span>
                   ) : (
                     'Create Project'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Project Modal */}
+      {showEditModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeEditModal()
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-modal-title"
+        >
+          <div 
+            ref={modalRef}
+            className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 
+                id="edit-modal-title"
+                className="text-lg font-semibold text-gray-900 dark:text-white"
+              >
+                Edit Project
+              </h2>
+              <button
+                onClick={closeEditModal}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                aria-label="Close modal"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {formError && (
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg">
+                <p className="text-red-700 dark:text-red-300 text-sm">{formError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateProject}>
+              <div className="mb-4">
+                <label 
+                  htmlFor="edit-project-name"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  Project Name
+                </label>
+                <input
+                  id="edit-project-name"
+                  ref={inputRef}
+                  type="text"
+                  value={editProjectName}
+                  onChange={(e) => setEditProjectName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Enter project name"
+                  disabled={submitting}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  2-100 characters, letters, numbers, spaces, hyphens, and underscores only
+                </p>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  disabled={submitting}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !editProjectName.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {submitting ? (
+                    <span className="flex items-center gap-2">
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                      Updating...
+                    </span>
+                  ) : (
+                    'Update Project'
                   )}
                 </button>
               </div>
