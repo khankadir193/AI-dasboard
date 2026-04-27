@@ -9,33 +9,23 @@ export const UserProfile = {
   created_at: 'string' // ISO date
 }
 
-// User Roles and Permissions
-export const UserRoles = {
-  ADMIN: 'admin',
-  USER: 'user',
-  VIEWER: 'viewer'
-}
+import {
+  ROLES,
+  PERMISSIONS,
+  ROLE_PERMISSIONS,
+  getRolePermissions,
+  hasPermission as _hasPermission,
+  hasAnyPermission as _hasAnyPermission,
+  hasAllPermissions as _hasAllPermissions,
+} from '../utils/permissions'
 
-export const RolePermissions = {
-  [UserRoles.ADMIN]: [
-    'read_data',
-    'write_data', 
-    'delete_data',
-    'manage_users',
-    'view_analytics',
-    'manage_settings'
-  ],
-  [UserRoles.USER]: [
-    'read_data',
-    'write_data',
-    'delete_data',
-    'view_analytics'
-  ],
-  [UserRoles.VIEWER]: [
-    'read_data',
-    'view_analytics'
-  ]
-}
+// Re-export for backward compatibility
+export { PERMISSIONS, ROLE_PERMISSIONS, getRolePermissions }
+
+// User Roles and Permissions (backward-compatible aliases)
+export const UserRoles = ROLES
+
+export const RolePermissions = ROLE_PERMISSIONS
 
 // User Validation Rules
 export const UserValidation = {
@@ -48,9 +38,8 @@ export const UserValidation = {
     required: true,
     minLength: 6,
     maxLength: 128,
-    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(value) // At least one lowercase, one uppercase, one number
+    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/ // At least one lowercase, one uppercase, one number
   },
-
 }
 
 // User Session Structure
@@ -84,21 +73,13 @@ export const UserActivity = {
   created_at: 'string'
 }
 
-// Helper Functions
-export const hasPermission = (userRole, permission) => {
-  return RolePermissions[userRole]?.includes(permission) || false
-}
+// Helper Functions (backward-compatible wrappers)
+export const hasPermission = (userRole, permission) => _hasPermission(userRole, permission)
 
-export const hasAnyPermission = (userRole, permissions) => {
-  const userPermissions = RolePermissions[userRole] || []
-  return permissions.some(permission => userPermissions.includes(permission))
-}
+export const hasAnyPermission = (userRole, permissions) => _hasAnyPermission(userRole, permissions)
 
-export const hasAllPermissions = (userRole, permissions) => {
-  const userPermissions = RolePermissions[userRole] || []
-  return permissions.every(permission => userPermissions.includes(permission))
-}
+export const hasAllPermissions = (userRole, permissions) => _hasAllPermissions(userRole, permissions)
 
-export const isAdmin = (userRole) => userRole === UserRoles.ADMIN
-export const canManageUsers = (userRole) => hasPermission(userRole, 'manage_users')
-export const canDeleteData = (userRole) => hasPermission(userRole, 'delete_data')
+export const isAdmin = (userRole) => userRole === ROLES.ADMIN
+export const canManageUsers = (userRole) => _hasPermission(userRole, PERMISSIONS.USERS_MANAGE)
+export const canDeleteData = (userRole) => _hasPermission(userRole, PERMISSIONS.PROJECTS_DELETE)

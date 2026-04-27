@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { supabase } from '../../lib/supabaseClient'
+import { getRolePermissions } from '../../utils/permissions'
 
 // Async thunk for fetching user profile with tenant data
 export const fetchUserProfile = createAsyncThunk(
@@ -101,39 +102,6 @@ const profileSlice = createSlice({
       })
   }
 })
-
-// Helper function to get permissions based on role
-function getRolePermissions(role) {
-  const permissions = {
-    admin: [
-      'view_dashboard',
-      'view_analytics',
-      'view_ai_insights',
-      'view_data_table',
-      'view_settings',
-      'manage_users',
-      'manage_tenant',
-      'export_data',
-      'delete_data'
-    ],
-    user: [
-      'view_dashboard',
-      'view_analytics',
-      'view_ai_insights',
-      'view_data_table',
-      'view_settings',
-      'export_data'
-    ],
-    viewer: [
-      'view_dashboard',
-      'view_analytics',
-      'view_ai_insights',
-      'view_data_table'
-    ]
-  }
-  
-  return permissions[role] || []
-}
 
 export const { clearProfileError, setProfile, clearProfile } = profileSlice.actions
 export default profileSlice.reducer

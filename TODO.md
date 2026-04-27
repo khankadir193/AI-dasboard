@@ -1,24 +1,24 @@
-# Fix Plan for Multi-Tenant SaaS App
+# Fix Role-Based Permission Bugs
 
-## Status: ✅ COMPLETE
+## Root Cause
+- `usePermission` reads `profile` from `state.profile`, but `AuthContext` dispatches profile to `state.auth` via `setUserProfile`.
+- `useTenantAuth` (which populates `state.profile`) is never invoked in the app, so `state.profile.profile` is always `null`.
+- Result: `role` is always `null` → `isAllowed = false` → buttons disabled for everyone, including admins.
+- Tooltip falls through to `"Authentication required"` because `!role` is true.
 
-## Issues Fixed
+## Tasks
 
-1. ✅ Fix PGRST116 error (replace .single() with .maybeSingle())
-2. ✅ Fix stale data after logout/login (clear Redux state)
-3. ✅ Fix session instability (improve auth state change listener)
-4. ✅ Ensure strict multi-tenant filtering (always use profile.company_id)
-5. ✅ Improve data fetching (async/await, avoid race conditions)
-6. ✅ UI safety (loading states, empty data handling)
-7. ✅ Code quality (keep API logic in service files)
+- [x] 1. Read and analyze all relevant files
+- [x] 2. Create TODO plan
+- [x] 3. Fix `src/hooks/usePermission.js`
+  - Read role from both `state.profile` and `state.auth`
+  - Use combined loading state so UI waits for profile
+  - Keep existing hook API unchanged
+- [x] 4. Fix `src/utils/permissions.js`
+  - Make `getPermissionTooltip` return role-based messages:
+    - "Admin only"
+    - "Admin or Manager only"
+  - Handle undefined/null role safely in helpers
+- [x] 5. Verify `src/components/auth/PermissionButton.jsx` needs no changes
+- [x] 6. Run build/lint to verify
 
-## Files Edited
-
-| # | File | Key Changes |
-|---|------|-------------|
-| 1 | `src/lib/tenantApi.js` | ✅ Replaced `.single()` → `.maybeSingle()`; fixed `.orderBy()` → `.order()`; changed `tenant_id` → `company_id` consistently; added null checks |
-| 2 | `src/features/dashboard/Dashboard.jsx` | ✅ Replaced `.single()` → `.maybeSingle()`; reset analytics state on session change; safe null handling |
-| 3 | `src/context/AuthContext.jsx` | ✅ Added `lastUserIdRef` to track user changes; clear Redux state before fetching new session data; handle `SIGNED_OUT` event explicitly |
-| 4 | `src/components/auth/ProtectedRoute.jsx` | ✅ Use `useAuth()` instead of Redux; removed 3s timeout; redirect to `/signin` |
-| 5 | `src/hooks/useTenantAuth.js` | ✅ Clear tenant state before fetching when `company_id` changes; track lastCompanyIdRef |
-| 6 | `src/features/projects/Projects.jsx` | ✅ Clear projects when `companyId` missing; import `clearProjects` action |

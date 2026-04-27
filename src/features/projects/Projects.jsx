@@ -12,6 +12,9 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext.jsx'
+import PermissionButton from '../../components/auth/PermissionButton.jsx'
+import { usePermission } from '../../hooks/usePermission'
+import { PERMISSIONS } from '../../utils/permissions'
 import {
   fetchProjects,
   createProject,
@@ -55,8 +58,12 @@ export default function Projects() {
   const inputRef = useRef(null)
   const modalRef = useRef(null)
 
-  const isAdmin = profile?.role === 'admin'
   const companyId = profile?.company_id
+
+  // Permission checks
+  const { isAllowed: canCreate } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_CREATE })
+  const { isAllowed: canUpdate, tooltip: updateTooltip } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_UPDATE })
+  const { isAllowed: canDelete, tooltip: deleteTooltip } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_DELETE })
 
   // ============================
   // Fetch projects on mount / when auth ready
@@ -155,6 +162,7 @@ export default function Projects() {
   // ============================
   const handleAddProject = async (e) => {
     e.preventDefault()
+    if (!canCreate) return
 
     const validationError = validateProjectName(newProjectName)
     if (validationError) {
@@ -173,10 +181,7 @@ export default function Projects() {
   }
 
   const handleDeleteProject = async (projectId, projectName) => {
-    if (!isAdmin) {
-      alert('Only administrators can delete projects.')
-      return
-    }
+    if (!canDelete) return
 
     const confirmed = confirm(
       `Are you sure you want to delete "${projectName || 'this project'}"? This action cannot be undone.`
@@ -191,10 +196,7 @@ export default function Projects() {
   }
 
   const handleEditProject = (project) => {
-    if (!isAdmin) {
-      alert('Only administrators can edit projects.')
-      return
-    }
+    if (!canUpdate) return
     setEditingProjectId(project.id)
     setEditProjectName(project.name)
     setShowEditModal(true)
@@ -202,6 +204,7 @@ export default function Projects() {
 
   const handleUpdateProject = async (e) => {
     e.preventDefault()
+    if (!canUpdate) return
 
     if (!editingProjectId || !editProjectName.trim()) {
       setFormError('Project name is required')
@@ -236,6 +239,43 @@ export default function Projects() {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A'
     return new Date(dateString).toLocaleDateString()
+  }
+
+  // ============================
+  // Guarded icon button helper
+  // ============================
+  function GuardedIconButton({ onClick, disabled, isAllowed, tooltip, className, children, ariaLabel }) {
+    const isDisabled = disabled || !isAllowed
+
+    const handleClick = (e) => {
+      if (isDisabled) {
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+      onClick(e)
+    }
+
+    const button = (
+      <button
+        onClick={handleClick}
+        disabled={isDisabled}
+        className={className}
+        aria-label={ariaLabel}
+      >
+        {children}
+      </button>
+    )
+
+    if (isDisabled && tooltip) {
+      return (
+        <span className="inline-block" title={tooltip} style={{ cursor: 'not-allowed' }}>
+          {button}
+        </span>
+      )
+    }
+
+    return button
   }
 
   // ============================
@@ -321,13 +361,15 @@ export default function Projects() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projects</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage your company projects</p>
         </div>
-        <button
+        <PermissionButton
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          requiredPermission={PERMISSIONS.PROJECTS_CREATE}
+          variant="primary"
+          className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
           Add Project
-        </button>
+        </PermissionButton>
       </div>
 
       {/* Filters */}
@@ -445,28 +487,30 @@ export default function Projects() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
-                        <button
+                        <GuardedIconButton
                           onClick={() => handleEditProject(project)}
-                          disabled={!isAdmin || updating}
+                          disabled={updating}
+                          isAllowed={canUpdate}
+                          tooltip={updateTooltip}
                           className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          aria-label={`Edit project ${project.name}`}
-                          title={isAdmin ? `Edit ${project.name}` : 'Only administrators can edit projects'}
+                          ariaLabel={`Edit project ${project.name}`}
                         >
                           <Edit className="h-4 w-4" />
-                        </button>
-                        <button
+                        </GuardedIconButton>
+                        <GuardedIconButton
                           onClick={() => handleDeleteProject(project.id, project.name)}
-                          disabled={!isAdmin || deletingId === project.id}
+                          disabled={deletingId === project.id}
+                          isAllowed={canDelete}
+                          tooltip={deleteTooltip}
                           className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          aria-label={`Delete project ${project.name}`}
-                          title={isAdmin ? `Delete ${project.name}` : 'Only administrators can delete projects'}
+                          ariaLabel={`Delete project ${project.name}`}
                         >
                           {deletingId === project.id ? (
                             <div className="animate-spin h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full"></div>
                           ) : (
                             <Trash2 className="h-4 w-4" />
                           )}
-                        </button>
+                        </GuardedIconButton>
                       </div>
                     </td>
                   </tr>
@@ -557,20 +601,15 @@ export default function Projects() {
                 >
                   Cancel
                 </button>
-                <button
+                <PermissionButton
                   type="submit"
+                  requiredPermission={PERMISSIONS.PROJECTS_CREATE}
+                  variant="primary"
                   disabled={creating || !newProjectName.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  loading={creating}
                 >
-                  {creating ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                      Creating...
-                    </span>
-                  ) : (
-                    'Create Project'
-                  )}
-                </button>
+                  {creating ? 'Creating...' : 'Create Project'}
+                </PermissionButton>
               </div>
             </form>
           </div>
@@ -654,20 +693,15 @@ export default function Projects() {
                 >
                   Cancel
                 </button>
-                <button
+                <PermissionButton
                   type="submit"
+                  requiredPermission={PERMISSIONS.PROJECTS_UPDATE}
+                  variant="primary"
                   disabled={updating || !editProjectName.trim()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  loading={updating}
                 >
-                  {updating ? (
-                    <span className="flex items-center gap-2">
-                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                      Updating...
-                    </span>
-                  ) : (
-                    'Update Project'
-                  )}
-                </button>
+                  {updating ? 'Updating...' : 'Update Project'}
+                </PermissionButton>
               </div>
             </form>
           </div>
