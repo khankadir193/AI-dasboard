@@ -1,7 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import { supabase } from '../lib/supabaseClient'
-import { setUserProfile } from '../store/slices/authSlice'
+import { setUserProfile, clearAuth } from '../store/slices/authSlice'
+import { clearProfile } from '../store/slices/profileSlice'
+import { clearTenant } from '../store/slices/tenantSlice'
+import { clearProjects } from '../store/slices/projectsSlice'
 
 const AuthContext = createContext(null)
 const AUTH_TIMEOUT_MS = 6000
@@ -13,6 +16,7 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const provisioningLocksRef = useRef(new Map())
+  const lastUserIdRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -84,7 +88,7 @@ export function AuthProvider({ children }) {
 
         if (!companyId) {
           const { data: company, error: companyError } = await withTimeout(
-            supabase.from('companies').insert({ name: companyName }).select().single(),
+            supabase.from('companies').insert({ name: companyName }).select().maybeSingle(),
             { data: null, error: new Error('Company provisioning timeout') }
           )
 
@@ -190,16 +194,39 @@ export function AuthProvider({ children }) {
 
     initializeSession()
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+      // Clear Redux state immediately on sign out to prevent stale data
+      if (event === 'SIGNED_OUT') {
+        dispatch(clearAuth())
+        dispatch(clearProfile())
+        dispatch(clearTenant())
+        dispatch(clearProjects())
+        lastUserIdRef.current = null
+      }
+
       const validatedSession = await resolveValidSession(nextSession ?? null)
       if (!mounted) return
+
+      const newUserId = validatedSession?.user?.id ?? null
+      const previousUserId = lastUserIdRef.current
+
+      // If user changed (login as different user), clear all state before fetching new data
+      if (newUserId && newUserId !== previousUserId) {
+        dispatch(clearAuth())
+        dispatch(clearProfile())
+        dispatch(clearTenant())
+        dispatch(clearProjects())
+      }
+
       setSession(validatedSession)
       if (validatedSession?.user?.id) {
+        lastUserIdRef.current = validatedSession.user.id
         const nextProfile = await ensureUserProvisioned(validatedSession.user)
         if (!mounted) return
         setProfile(nextProfile)
       } else {
         setProfile(null)
+        lastUserIdRef.current = null
       }
       setIsLoading(false)
     })
@@ -209,7 +236,7 @@ export function AuthProvider({ children }) {
       if (initTimeoutId) clearTimeout(initTimeoutId)
       authListener.subscription.unsubscribe()
     }
-  }, [])
+  }, [dispatch])
 
   const signOut = useCallback(async () => {
     setIsSigningOut(true)
@@ -217,20 +244,18 @@ export function AuthProvider({ children }) {
       await supabase.auth.signOut()
       setSession(null)
       setProfile(null)
+      // Clear all Redux state to prevent stale data on next login
+      dispatch(clearAuth())
+      dispatch(clearProfile())
+      dispatch(clearTenant())
+      dispatch(clearProjects())
     } finally {
       setIsSigningOut(false)
     }
-  }, [])
+  }, [dispatch])
 
   const user = session?.user ?? null
-  const firstName = profile?.first_name ?? user?.user_metadata?.first_name ?? null
-  const lastName = profile?.last_name ?? user?.user_metadata?.last_name ?? null
-  const fullNameFromProfile = profile?.full_name ?? null
-  const displayName =
-    fullNameFromProfile ||
-    [firstName, lastName].filter(Boolean).join(' ').trim() ||
-    user?.email?.split('@')[0] ||
-    'User'
+  const displayName = user?.email?.split('@')[0] || 'User'
   const initials = displayName
     .split(' ')
     .map((part) => part[0])

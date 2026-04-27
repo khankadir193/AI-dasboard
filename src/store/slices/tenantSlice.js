@@ -10,9 +10,10 @@ export const fetchTenantDetails = createAsyncThunk(
         .from('companies')
         .select('*')
         .eq('id', tenantId)
-        .single()
+        .maybeSingle()
 
       if (error) throw error
+      if (!data) throw new Error('Company not found')
       
       return data
     } catch (error) {
@@ -31,9 +32,10 @@ export const updateTenantSettings = createAsyncThunk(
         .update({ settings })
         .eq('id', tenantId)
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) throw error
+      if (!data) throw new Error('Company update failed')
       
       return data
     } catch (error) {

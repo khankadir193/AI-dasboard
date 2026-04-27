@@ -40,10 +40,10 @@ class TenantApiService {
       let query = supabase.from('analytics').select('*')
       query = this.addTenantFilter(query, 'analytics')
       
-      const { data, error } = await query.orderBy('created_at', { ascending: false })
+      const { data, error } = await query.order('created_at', { ascending: false })
       
       if (error) throw error
-      return data
+      return data || []
     } catch (error) {
       console.warn('Analytics table not found, returning mock data:', error.message)
       // Return mock data for demo purposes
@@ -57,7 +57,7 @@ class TenantApiService {
 
   async createAnalytics(analyticsData) {
     if (!this.currentTenantId) {
-      throw new Error('Tenant ID not set')
+      throw new Error('Company ID not set')
     }
 
     try {
@@ -65,12 +65,13 @@ class TenantApiService {
         .from('analytics')
         .insert({
           ...analyticsData,
-          tenant_id: this.currentTenantId
+          company_id: this.currentTenantId
         })
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) throw error
+      if (!data) throw new Error('Failed to create analytics')
       return data
     } catch (error) {
       console.warn('Failed to create analytics, table may not exist:', error.message)
@@ -78,7 +79,7 @@ class TenantApiService {
       return {
         id: Date.now().toString(),
         ...analyticsData,
-        tenant_id: this.currentTenantId,
+        company_id: this.currentTenantId,
         created_at: new Date().toISOString()
       }
     }
@@ -100,10 +101,10 @@ class TenantApiService {
       let query = supabase.from('kpis').select('*')
       query = this.addTenantFilter(query, 'kpis')
       
-      const { data, error } = await query.orderBy('created_at', { ascending: false })
+      const { data, error } = await query.order('created_at', { ascending: false })
       
       if (error) throw error
-      return data
+      return data || []
     } catch (error) {
       console.warn('KPIs table not found, returning mock data:', error.message)
       // Return mock data for demo purposes
@@ -117,16 +118,21 @@ class TenantApiService {
   }
 
   async createKpi(kpiData) {
+    if (!this.currentTenantId) {
+      throw new Error('Company ID not set')
+    }
+
     const { data, error } = await supabase
       .from('kpis')
       .insert({
         ...kpiData,
-        tenant_id: this.currentTenantId
+        company_id: this.currentTenantId
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('Failed to create KPI')
     return data
   }
 
@@ -135,12 +141,13 @@ class TenantApiService {
       .from('kpis')
       .update(updates)
       .eq('id', kpiId)
-    
+
     query = this.addTenantFilter(query, 'kpis')
-    
-    const { data, error } = await query.select().single()
-    
+
+    const { data, error } = await query.select().maybeSingle()
+
     if (error) throw error
+    if (!data) throw new Error('KPI not found')
     return data
   }
 
@@ -151,31 +158,36 @@ class TenantApiService {
       .select(`
         *,
         profiles!ai_insights_user_id_fkey (
-          first_name,
-          last_name
+          id,
+          role
         )
       `)
-    
+
     query = this.addTenantFilter(query, 'ai_insights')
-    
-    const { data, error } = await query.orderBy('created_at', { ascending: false })
-    
+
+    const { data, error } = await query.order('created_at', { ascending: false })
+
     if (error) throw error
-    return data
+    return data || []
   }
 
   async createAiInsight(insightData, userId) {
+    if (!this.currentTenantId) {
+      throw new Error('Company ID not set')
+    }
+
     const { data, error } = await supabase
       .from('ai_insights')
       .insert({
         ...insightData,
-        tenant_id: this.currentTenantId,
+        company_id: this.currentTenantId,
         user_id: userId
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('Failed to create AI insight')
     return data
   }
 
@@ -186,31 +198,36 @@ class TenantApiService {
       .select(`
         *,
         profiles:data_tables_created_by_fkey (
-          first_name,
-          last_name
+          id,
+          role
         )
       `)
-    
+
     query = this.addTenantFilter(query, 'data_tables')
-    
-    const { data, error } = await query.orderBy('created_at', { ascending: false })
-    
+
+    const { data, error } = await query.order('created_at', { ascending: false })
+
     if (error) throw error
-    return data
+    return data || []
   }
 
   async createDataTable(tableData, userId) {
+    if (!this.currentTenantId) {
+      throw new Error('Company ID not set')
+    }
+
     const { data, error } = await supabase
       .from('data_tables')
       .insert({
         ...tableData,
-        tenant_id: this.currentTenantId,
+        company_id: this.currentTenantId,
         created_by: userId
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('Failed to create data table')
     return data
   }
 
@@ -220,12 +237,13 @@ class TenantApiService {
       .update(updates)
       .eq('id', tableId)
       .eq('created_by', userId) // Only creator can update
-    
+
     query = this.addTenantFilter(query, 'data_tables')
-    
-    const { data, error } = await query.select().single()
-    
+
+    const { data, error } = await query.select().maybeSingle()
+
     if (error) throw error
+    if (!data) throw new Error('Data table not found')
     return data
   }
 
@@ -247,16 +265,17 @@ class TenantApiService {
   // Tenant management methods
   async getTenantDetails() {
     if (!this.currentTenantId) {
-      throw new Error('Tenant ID not set')
+      throw new Error('Company ID not set')
     }
 
     const { data, error } = await supabase
       .from('companies')
       .select('*')
       .eq('id', this.currentTenantId)
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('Company not found')
     return data
   }
 
@@ -270,16 +289,17 @@ class TenantApiService {
       .update({ settings })
       .eq('id', this.currentTenantId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('Company update failed')
     return data
   }
 
   // User management methods (for admins)
   async getTenantUsers() {
     if (!this.currentTenantId) {
-      throw new Error('Tenant ID not set')
+      throw new Error('Company ID not set')
     }
 
     const { data, error } = await supabase
@@ -291,26 +311,27 @@ class TenantApiService {
           created_at
         )
       `)
-      .eq('tenant_id', this.currentTenantId)
+      .eq('company_id', this.currentTenantId)
 
     if (error) throw error
-    return data
+    return data || []
   }
 
   async updateUserRole(userId, role) {
     if (!this.currentTenantId) {
-      throw new Error('Tenant ID not set')
+      throw new Error('Company ID not set')
     }
 
     const { data, error } = await supabase
       .from('profiles')
       .update({ role })
       .eq('id', userId)
-      .eq('tenant_id', this.currentTenantId)
+      .eq('company_id', this.currentTenantId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('User not found')
     return data
   }
 

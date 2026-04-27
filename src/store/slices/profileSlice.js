@@ -10,9 +10,10 @@ export const fetchUserProfile = createAsyncThunk(
         .from('profiles')
         .select("*, companies(*)")
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (error) throw error
+      if (!data) throw new Error('User profile not found')
       
       return data
     } catch (error) {
@@ -31,9 +32,10 @@ export const updateUserProfile = createAsyncThunk(
         .update(updates)
         .eq('id', userId)
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) throw error
+      if (!data) throw new Error('Profile update failed')
       
       return data
     } catch (error) {

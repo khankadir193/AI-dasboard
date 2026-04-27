@@ -71,7 +71,7 @@ export default function Dashboard() {
           .from('profiles')
           .select('company_id')
           .eq('id', session.user.id)
-          .single()
+          .maybeSingle()
 
         if (profileError || !profile?.company_id) {
           setTrialInfo({
@@ -87,7 +87,7 @@ export default function Dashboard() {
           .from('companies')
           .select('id, name, created_at')
           .eq('id', profile.company_id)
-          .single()
+          .maybeSingle()
 
         if (companyError || !company?.created_at) {
           setTrialInfo({
@@ -127,7 +127,23 @@ export default function Dashboard() {
 
   // Analytics data fetching
   const fetchAnalyticsData = async () => {
-    if (!session?.user?.id) return
+    if (!session?.user?.id) {
+      // Reset analytics state when no session to prevent stale data
+      setAnalyticsData({
+        revenueData: [],
+        usersData: [],
+        projectStatusData: [],
+        kpiData: {
+          totalRevenue: 0,
+          activeUsers: 0,
+          conversionRate: 0,
+          newOrders: 0
+        },
+        isLoading: false,
+        error: null
+      })
+      return
+    }
 
     try {
       setAnalyticsData(prev => ({ ...prev, isLoading: true, error: null }))
@@ -137,7 +153,7 @@ export default function Dashboard() {
         .from('profiles')
         .select('company_id')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
 
       if (profileError || !profile?.company_id) {
         throw new Error('Company not found')
@@ -188,11 +204,19 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error fetching analytics data:', error)
-      setAnalyticsData(prev => ({
-        ...prev,
+      setAnalyticsData({
+        revenueData: [],
+        usersData: [],
+        projectStatusData: [],
+        kpiData: {
+          totalRevenue: 0,
+          activeUsers: 0,
+          conversionRate: 0,
+          newOrders: 0
+        },
         isLoading: false,
         error: error.message
-      }))
+      })
     }
   }
 

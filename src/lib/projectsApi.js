@@ -22,7 +22,7 @@ export const createProject = async (name, company_id) => {
         status: "active"
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       // Handle specific Supabase errors
@@ -88,7 +88,7 @@ export const deleteProject = async (projectId) => {
       .delete()
       .eq("id", projectId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       // Handle specific Supabase errors
@@ -120,9 +120,10 @@ export const updateProjectStatus = async (projectId, status) => {
       .update({ status })
       .eq("id", projectId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('Project not found')
     return data
   } catch (error) {
     console.error('Error updating project status:', error)
@@ -137,9 +138,10 @@ export const getProject = async (projectId) => {
       .from("projects")
       .select("*")
       .eq("id", projectId)
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) throw new Error('Project not found')
     return data
   } catch (error) {
     console.error('Error fetching project:', error)

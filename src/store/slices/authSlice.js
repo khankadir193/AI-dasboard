@@ -42,9 +42,10 @@ export const signUp = createAsyncThunk(
         .from('companies')
         .insert({ name: companyName })
         .select()
-        .single()
+        .maybeSingle()
 
       if (tenantError) throw tenantError
+      if (!tenant) throw new Error('Failed to create company')
 
       // Step 3: Create user profile
       const { error: profileError } = await supabase
@@ -109,6 +110,13 @@ const authSlice = createSlice({
     },
     setUserProfile: (state, action) => {
       state.profile = action.payload
+    },
+    clearAuth: (state) => {
+      state.user = null
+      state.profile = null
+      state.isAuthenticated = false
+      state.isLoading = false
+      state.error = null
     }
   },
   extraReducers: (builder) => {
@@ -150,6 +158,7 @@ const authSlice = createSlice({
       // Sign Out
       .addCase(signOut.fulfilled, (state) => {
         state.user = null
+        state.profile = null
         state.isAuthenticated = false
         state.error = null
       })
@@ -171,5 +180,5 @@ const authSlice = createSlice({
   }
 })
 
-export const { clearError, setAuthUser, setUserProfile } = authSlice.actions
+export const { clearError, setAuthUser, setUserProfile, clearAuth } = authSlice.actions
 export default authSlice.reducer

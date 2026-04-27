@@ -1,32 +1,9 @@
-import { useSelector } from 'react-redux'
 import { Navigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useAuth } from '../../context/AuthContext'
 
 export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading, user } = useSelector((state) => state.auth)
-  const [authTimeout, setAuthTimeout] = useState(false)
-
-  // Debug logging
-  console.log('ProtectedRoute - Auth state:', { isAuthenticated, isLoading, user })
-
-  // Set a timeout for auth initialization
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isLoading) {
-        console.log('Auth initialization taking too long, forcing redirect')
-        setAuthTimeout(true)
-      }
-    }, 3000) // 3 second timeout
-
-    return () => clearTimeout(timer)
-  }, [isLoading])
-
-  // If auth times out or still loading after timeout, redirect to signup
-  if (authTimeout || (isLoading && authTimeout)) {
-    console.log('Auth timeout, redirecting to signup')
-    return <Navigate to="/signup" replace />
-  }
+  const { isAuthenticated, isLoading } = useAuth()
 
   // If we're still loading auth state, show loading
   if (isLoading) {
@@ -40,13 +17,11 @@ export default function ProtectedRoute({ children }) {
     )
   }
 
-  // If not authenticated, redirect to signup
+  // If not authenticated, redirect to signin
   if (!isAuthenticated) {
-    console.log('Not authenticated, redirecting to signup')
-    return <Navigate to="/signup" replace />
+    return <Navigate to="/signin" replace />
   }
 
   // If authenticated, render protected content
-  console.log('Authenticated, rendering protected content')
   return children
 }

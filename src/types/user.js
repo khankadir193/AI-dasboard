@@ -3,16 +3,10 @@
 // User Profile Structure
 export const UserProfile = {
   id: 'string', // UUID
-  email: 'string',
   role: 'string', // admin, user, viewer
   permissions: 'array', // Array of permission strings
   company_id: 'string', // UUID
-  first_name: 'string',
-  last_name: 'string',
-  avatar_url: 'string',
-  is_active: 'boolean',
-  created_at: 'string', // ISO date
-  updated_at: 'string' // ISO date
+  created_at: 'string' // ISO date
 }
 
 // User Roles and Permissions
@@ -56,16 +50,7 @@ export const UserValidation = {
     maxLength: 128,
     pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(value) // At least one lowercase, one uppercase, one number
   },
-  FIRST_NAME: {
-    required: false,
-    maxLength: 50,
-    pattern: /^[a-zA-Z\s'-]+$/
-  },
-  LAST_NAME: {
-    required: false,
-    maxLength: 50,
-    pattern: /^[a-zA-Z\s'-]+$/
-  }
+
 }
 
 // User Session Structure

@@ -175,9 +175,10 @@ class AnalyticsApiService {
           metadata
         })
         .select()
-        .single()
+        .maybeSingle()
 
       if (error) throw error
+      if (!data) throw new Error('Failed to insert analytics data')
       return data
     } catch (error) {
       console.error('Error inserting analytics data:', error)

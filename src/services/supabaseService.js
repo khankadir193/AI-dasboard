@@ -41,28 +41,28 @@ export const db = {
       )
     `)
     .eq('id', userId)
-    .single(),
-    
+    .maybeSingle(),
+
   updateProfile: (userId, updates) => supabase
     .from('profiles')
     .update(updates)
     .eq('id', userId)
     .select()
-    .single(),
-    
+    .maybeSingle(),
+
   // Company helpers
   getCompany: (companyId) => supabase
     .from('companies')
     .select('*')
     .eq('id', companyId)
-    .single(),
-    
+    .maybeSingle(),
+
   updateCompany: (companyId, updates) => supabase
     .from('companies')
     .update(updates)
     .eq('id', companyId)
     .select()
-    .single(),
+    .maybeSingle(),
     
   // Realtime subscriptions
   subscribe: (table, callback) => {
