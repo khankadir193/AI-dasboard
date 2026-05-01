@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import {
   LayoutDashboard,
   BarChart3,
@@ -12,7 +13,6 @@ import {
   FolderKanban,
 } from 'lucide-react'
 import clsx from 'clsx'
-import { useAuth } from '../../context/AuthContext'
 
 const navItems = [
   { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard'   },
@@ -29,7 +29,16 @@ const authItems = [
 ]
 
 export default function Sidebar({ open, onClose }) {
-  const { displayName, email, initials } = useAuth()
+  const { user, profile } = useSelector((state) => state.auth)
+  
+  const displayName = user?.email?.split('@')[0] || 'User'
+  const initials = displayName
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+  const email = user?.email || ''
 
   return (
     <>

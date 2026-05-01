@@ -1,12 +1,14 @@
 import { Navigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
+import { useSelector } from 'react-redux'
 
 export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { user, loading, profile } = useSelector((state) => state.auth)
 
-  // If we're still loading auth state, show loading
-  if (isLoading) {
+  // FIX: If we're still loading auth state OR profile is not ready, show loading
+  // This ensures profile is loaded before allowing access to protected routes
+  if (loading || !profile) {
+    console.log("PROTECTED_ROUTE -> Loading:", loading, "Profile:", profile ? "ready" : "not ready")
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -18,10 +20,10 @@ export default function ProtectedRoute({ children }) {
   }
 
   // If not authenticated, redirect to signin
-  if (!isAuthenticated) {
+  if (!user) {
     return <Navigate to="/signin" replace />
   }
 
-  // If authenticated, render protected content
+  // If authenticated and profile loaded, render protected content
   return children
 }

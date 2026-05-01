@@ -11,7 +11,6 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext.jsx'
 import PermissionButton from '../../components/auth/PermissionButton.jsx'
 import { usePermission } from '../../hooks/usePermission'
 import { PERMISSIONS } from '../../utils/permissions'
@@ -35,7 +34,7 @@ import {
 
 export default function Projects() {
   const dispatch = useDispatch()
-  const { profile, isLoading: authLoading } = useAuth()
+  const { profile, isLoading: authLoading } = useSelector((state) => state.auth)
 
   // Redux state
   const projects = useSelector(selectProjects)

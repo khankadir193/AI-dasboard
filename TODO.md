@@ -1,24 +1,48 @@
-# Fix Role-Based Permission Bugs
+# Bug Fix TODO
 
-## Root Cause
-- `usePermission` reads `profile` from `state.profile`, but `AuthContext` dispatches profile to `state.auth` via `setUserProfile`.
-- `useTenantAuth` (which populates `state.profile`) is never invoked in the app, so `state.profile.profile` is always `null`.
-- Result: `role` is always `null` → `isAllowed = false` → buttons disabled for everyone, including admins.
-- Tooltip falls through to `"Authentication required"` because `!role` is true.
+## Summary
+Fix: "No company associated with your account" error appearing after refresh/sign-out/sign-in
 
-## Tasks
+## Files Modified
+1. ✅ src/services/profileService.js - Enhanced error logging
+2. ✅ src/services/projectsService.js - Improved error messages  
+3. ✅ src/services/provisionService.js - Added ensureUserProvisioned function
+4. ✅ src/providers/AuthProvider.jsx - Added profile verification on sign-in
 
-- [x] 1. Read and analyze all relevant files
-- [x] 2. Create TODO plan
-- [x] 3. Fix `src/hooks/usePermission.js`
-  - Read role from both `state.profile` and `state.auth`
-  - Use combined loading state so UI waits for profile
-  - Keep existing hook API unchanged
-- [x] 4. Fix `src/utils/permissions.js`
-  - Make `getPermissionTooltip` return role-based messages:
-    - "Admin only"
-    - "Admin or Manager only"
-  - Handle undefined/null role safely in helpers
-- [x] 5. Verify `src/components/auth/PermissionButton.jsx` needs no changes
-- [x] 6. Run build/lint to verify
+## What the Fix Does
 
+### 1. profileService.js
+- Added detailed logging for debugging
+- Logs when userId is null
+- Logs profile fetch errors with code, message, details
+- Logs when profile is not found
+
+### 2. projectsService.js  
+- Added console.error for debugging
+- Improved error message: "User profile not found. Please sign up or contact support."
+- Keeps "No company associated" only for when company_id is NULL
+
+### 3. provisionService.js
+- Added ensureUserProvisioned function
+- Checks if profile exists with company_id
+- Only creates company/profile if needed
+- Prevents duplicate company creation
+
+### 4. AuthProvider.jsx
+- Added provisioningRef to prevent race conditions
+- On initializeAuth: checks profile.company_id, calls ensureUserProvisioned if NULL
+- On SIGNED_IN: checks profile.company_id, calls ensureUserProvisioned if NULL
+- Uses guard: if (profile?.company_id) return;
+
+## Testing
+- [ ] Test: Sign up fresh - should work
+- [ ] Test: Refresh page - should work
+- [ ] Test: Sign out and sign in - should work
+- [ ] Test: Create project - should work
+- [ ] Test: Refresh after creating project - should work
+
+## Notes
+- The database trigger still handles initial signup
+- Frontend provisionService handles edge cases
+- No duplicate company creation possible
+- Guard prevents race conditions

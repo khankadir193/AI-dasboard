@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { Users, DollarSign, TrendingUp, ShoppingCart } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -8,14 +9,13 @@ import {
 import KPICard from '../../components/ui/KPICard'
 import { formatCurrency } from '../../utils/mockData'
 import { Loader2 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
 import { analyticsApi } from '../../lib/analyticsApi'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { session, isLoading: isAuthLoading } = useAuth()
+  const { user, isLoading: isAuthLoading, profile } = useSelector((state) => state.auth)
   const [loading, setLoading] = useState(true)
   const [todos, setTodos] = useState([])
   const [trialInfo, setTrialInfo] = useState({
@@ -49,14 +49,14 @@ export default function Dashboard() {
   ]
 
   useEffect(() => {
-    if (!isAuthLoading && !session) {
+    if (!isAuthLoading && !user) {
       navigate('/signin', { replace: true })
     }
-  }, [isAuthLoading, session, navigate])
+  }, [isAuthLoading, user, navigate])
 
   useEffect(() => {
     const fetchTrialInfo = async () => {
-      if (!session?.user?.id) {
+      if (!user?.id) {
         setTrialInfo({
           isLoading: false,
           trialEnd: null,
@@ -67,13 +67,13 @@ export default function Dashboard() {
       }
 
       try {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('company_id')
-          .eq('id', session.user.id)
+          .eq('id', user.id)
           .maybeSingle()
 
-        if (profileError || !profile?.company_id) {
+        if (profileError || !profileData?.company_id) {
           setTrialInfo({
             isLoading: false,
             trialEnd: null,
@@ -86,7 +86,7 @@ export default function Dashboard() {
         const { data: company, error: companyError } = await supabase
           .from('companies')
           .select('id, name, created_at')
-          .eq('id', profile.company_id)
+          .eq('id', profileData.company_id)
           .maybeSingle()
 
         if (companyError || !company?.created_at) {
@@ -123,12 +123,17 @@ export default function Dashboard() {
     }
 
     fetchTrialInfo()
-  }, [session])
+  }, [user])
 
-  // Analytics data fetching
+// Analytics data fetching
   const fetchAnalyticsData = async () => {
-    if (!session?.user?.id) {
-      // Reset analytics state when no session to prevent stale data
+    // DEBUG: Log current state
+    console.log("DASHBOARD -> PROFILE:", profile)
+    console.log("DASHBOARD -> COMPANY ID:", profile?.company_id)
+
+    // GUARD 1: Do NOT fetch if user or company_id is not ready
+    if (!user?.id || !profile?.company_id) {
+      console.log("DASHBOARD -> Guarding: user or company_id not ready")
       setAnalyticsData({
         revenueData: [],
         usersData: [],
@@ -149,18 +154,18 @@ export default function Dashboard() {
       setAnalyticsData(prev => ({ ...prev, isLoading: true, error: null }))
 
       // Get user profile to set company ID
-      const { data: profile, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('company_id')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .maybeSingle()
 
-      if (profileError || !profile?.company_id) {
+      if (profileError || !profileData?.company_id) {
         throw new Error('Company not found')
       }
 
       // Set company ID in analytics API
-      analyticsApi.setCompanyId(profile.company_id)
+      analyticsApi.setCompanyId(profileData.company_id)
 
       // Fetch all analytics data in parallel
       const [revenueData, usersData, projectStatusData, kpiData] = await Promise.all([
@@ -220,9 +225,16 @@ export default function Dashboard() {
     }
   }
 
+// FIX: Trigger fetch when company_id exists, not just when user exists
   useEffect(() => {
+    // Only fetch when profile's company_id is available
+    if (!profile?.company_id) {
+      console.log("DASHBOARD -> useEffect: company_id not ready, skipping fetch")
+      return
+    }
+    console.log("DASHBOARD -> useEffect: company_id ready, fetching data")
     fetchAnalyticsData()
-  }, [session])
+  }, [profile?.company_id])
 
   useEffect(() => {
     // Simulate loading for todos

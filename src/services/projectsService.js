@@ -29,14 +29,17 @@ export const getUserProfile = async (userId) => {
     .maybeSingle()
 
   if (error) {
+    console.error('[projectsService] Profile fetch error:', error.message)
     throw new Error(`Profile fetch error: ${error.message}`)
   }
 
   if (!data) {
-    throw new Error('User profile not found')
+    console.error('[projectsService] Profile not found for user:', userId)
+    throw new Error('User profile not found. Please sign up or contact support.')
   }
 
   if (!data.company_id) {
+    console.error('[projectsService] Profile exists but company_id is null for user:', userId)
     throw new Error('No company associated with your account. Please contact support.')
   }
 
