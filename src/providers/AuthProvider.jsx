@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useDispatch } from 'react-redux'
 import { supabase } from '../lib/supabaseClient'
 import { setUser, setProfile, setLoading, clearUser } from '../store/slices/authSlice'
 import { clearTenant } from '../store/slices/tenantSlice'
@@ -8,186 +8,66 @@ import { fetchProfile } from '../services/profileService'
 import FullScreenLoader from '../components/common/FullScreenLoader'
 
 /**
- * AuthProvider - STRICT authentication
- * ONLY trusts Supabase, NEVER trusts persisted state
+ * AuthProvider - Simplified authentication
+ * - Does NOT force logout on missing profile
+ * - Profile handling moved to onAuthStateChange
+ * - Always ensures loading completes to prevent UI stuck
  */
 export default function AuthProvider({ children }) {
   const dispatch = useDispatch()
   const [isInitialized, setIsInitialized] = useState(false)
   const timeoutRef = useRef(null)
-  const isResettingRef = useRef(false)
 
   useEffect(() => {
     let isMounted = true
 
     /**
-     * STRICT: Hard reset on app load
-     * - First verify user with getUser()
-     * - Then validate session + profile
-     * - Force signOut if invalid
+     * initializeAuth - SIMPLIFIED
+     * - ONLY checks session
+     * - Sets user if session exists
+     * - ALWAYS sets loading=false to prevent stuck UI
+     * - Does NOT fetch profile here
      */
     const initializeAuth = async () => {
-      // Prevent infinite loops
-      if (isResettingRef.current) {
-        console.log('[AuthProvider] Already resetting, skipping...')
-        return
-      }
-
       try {
         dispatch(setLoading(true))
+        console.log('[AuthProvider] Checking for existing session...')
 
-        console.log('[AuthProvider] Starting STRICT auth check...')
-
-        // ---------------------------------------------------------
-        // STEP 1: HARD VALIDATE with getUser()
-        // This verifies the JWT token is legitimate
-        // ---------------------------------------------------------
-        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser()
-
-        if (!isMounted) return
-
-        // If NO USER or ERROR - FORCE LOGOUT
-        if (!authUser || userError) {
-          console.log('[AuthProvider] No valid user from getUser() - forcing logout')
-          
-          // Mark resetting to prevent loops
-          isResettingRef.current = true
-          
-          // Force sign out to clear browser session
-          await supabase.auth.signOut().catch(() => {})
-          
-          // Clear ALL state
-          dispatch(clearUser())
-          dispatch(clearTenant())
-          dispatch(clearProjects())
-          
-          // Reset flag
-          isResettingRef.current = false
-          
-          // STOP execution
-          dispatch(setLoading(false))
-          setIsInitialized(true)
-          return
-        }
-
-        // ---------------------------------------------------------
-        // STEP 2: Get session and validate profile
-        // ---------------------------------------------------------
-        console.log('[AuthProvider] User validated:', authUser.id, 'email:', authUser.email)
-
+        // Get session only
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
         if (!isMounted) return
 
-        // If session error - logout
-        if (sessionError) {
-          console.log('[AuthProvider] Session error:', sessionError.message)
-          isResettingRef.current = true
-          await supabase.auth.signOut().catch(() => {})
+        // If no session or error - clear and finish
+        if (!session || sessionError) {
+          console.log('[AuthProvider] No valid session, setting loading complete')
           dispatch(clearUser())
-          dispatch(clearTenant())
-          dispatch(clearProjects())
-          isResettingRef.current = false
           dispatch(setLoading(false))
           setIsInitialized(true)
           return
         }
 
-        if (!session) {
-          console.log('[AuthProvider] No session found')
-          isResettingRef.current = true
-          await supabase.auth.signOut().catch(() => {})
-          dispatch(clearUser())
-          dispatch(clearTenant())
-          dispatch(clearProjects())
-          isResettingRef.current = false
-          dispatch(setLoading(false))
-          setIsInitialized(true)
-          return
-        }
-
-        // ---------------------------------------------------------
-        // STEP 3: Fetch profile and validate company_id
-        // ---------------------------------------------------------
-        console.log('[AuthProvider] Fetching profile for:', session.user.id)
-        console.log('[AuthProvider] Session user:', session.user.email)
-        
-        let profile = null
-        
-        try {
-          profile = await fetchProfile(session.user.id)
-          console.log('[AuthProvider] Profile fetched:', profile)
-        } catch (pfError) {
-          console.log('[AuthProvider] Profile fetch error:', pfError.message)
-          profile = null
-        }
-
-        if (!isMounted) return
-
-        // ---------------------------------------------------------
-        // STRICT CHECK: Profile MUST exist with company_id
-        // Retry once to handle DB trigger delays
-        // ---------------------------------------------------------
-        if (!profile || !profile.company_id) {
-          console.log('[AuthProvider] Profile missing or invalid company_id. Profile:', profile)
-          console.log('[AuthProvider] Retrying fetch after 500ms...')
-          
-          // Retry once after small delay
-          await new Promise(res => setTimeout(res, 500))
-          profile = await fetchProfile(session.user.id).catch(() => null)
-          console.log('[AuthProvider] Retry profile result:', profile)
-        }
-
-        if (!profile || !profile.company_id) {
-          console.log('[AuthProvider] Profile still missing → forcing logout')
-          
-          await supabase.auth.signOut().catch(() => {})
-          dispatch(clearUser())
-          dispatch(clearTenant())
-          dispatch(clearProjects())
-          dispatch(setLoading(false))
-          setIsInitialized(true)
-          return
-        }
-
-        // ---------------------------------------------------------
-        // STEP 4: All valid - set user and profile
-        // ---------------------------------------------------------
-        console.log('[AuthProvider] All valid - setting user and profile')
-        console.log('[AuthProvider] User to set:', session.user.id, session.user.email)
-        console.log('[AuthProvider] Profile to set:', profile.id, profile.company_id)
-        
+        // Session exists - set user only
+        console.log('[AuthProvider] Session found for:', session.user.id)
         dispatch(setUser(session.user))
-        dispatch(setProfile(profile))
         dispatch(setLoading(false))
         setIsInitialized(true)
 
-        console.log('[AuthProvider] Auth complete - user:', session.user.id, 'company:', profile.company_id)
+        console.log('[AuthProvider] Init complete - user set, loading false')
 
       } catch (error) {
-        console.log('[AuthProvider] Auth error:', error.message)
-        
-        // On any error, force logout
-        isResettingRef.current = true
-        await supabase.auth.signOut().catch(() => {})
-        
+        console.log('[AuthProvider] Init error:', error.message)
+        // On any error, still complete loading to prevent stuck
         dispatch(clearUser())
-        dispatch(clearTenant())
-        dispatch(clearProjects())
-        
-        isResettingRef.current = false
-        
-        if (isMounted) {
-          dispatch(setLoading(false))
-          setIsInitialized(true)
-        }
+        dispatch(setLoading(false))
+        setIsInitialized(true)
       }
     }
 
-    // Start auth initialization
+    // Start initialization
     initializeAuth()
 
-    // 5-second timeout fallback
+    // Timeout fallback - ensures we never get stuck
     timeoutRef.current = setTimeout(() => {
       if (!isInitialized) {
         console.log('[AuthProvider] Timeout - forcing load complete')
@@ -197,54 +77,53 @@ export default function AuthProvider({ children }) {
     }, 5000)
 
     /**
-     * Listen for auth state changes
-     * This handles browser tab events and Supabase events
+     * onAuthStateChange - HANDLE ALL profile logic here
+     * - SIGNED_IN: setUser, fetchProfile, retry once
+     * - SIGNED_OUT: clear all state
+     * - NO forced logout on missing profile
      */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return
 
         console.log('[AuthProvider] Auth event:', event)
-        console.log('[AuthProvider] Session in event:', session ? 'exists' : 'null')
-        if (session) {
-          console.log('[AuthProvider] Session user:', session.user?.id, session.user?.email)
-        }
 
         // SIGNED_OUT - clear everything
         if (event === 'SIGNED_OUT') {
-          console.log('[AuthProvider] Signed out detected - clearing all state')
+          console.log('[AuthProvider] Signed out - clearing all state')
           dispatch(clearUser())
           dispatch(clearTenant())
           dispatch(clearProjects())
           return
         }
 
-        console.log('session...kadir', session);
-        // SIGNED_IN - validate and set state
+        // SIGNED_IN - handle profile with retry logic
         if (event === 'SIGNED_IN' && session && session.user) {
-          console.log('[AuthProvider] SIGNED_IN detected for user:', session.user.id)
+          console.log('[AuthProvider] SIGNED_IN for:', session.user.id)
+
+          // Always set user first
+          dispatch(setUser(session.user))
+
+          // Fetch profile
           let profile = await fetchProfile(session.user.id).catch(() => null)
+          console.log('[AuthProvider] Profile fetch result:', profile ? 'found' : 'null')
 
-          console.log('[AuthProvider] First profile fetch result:', profile)
-
-          if (!profile || !profile.company_id) {
-            console.log('[AuthProvider] Profile missing/invalid, retrying...')
+          // Retry once after 500ms if profile missing
+          if (!profile) {
+            console.log('[AuthProvider] Profile missing, retrying in 500ms...')
             await new Promise(res => setTimeout(res, 500))
             profile = await fetchProfile(session.user.id).catch(() => null)
-            console.log('[AuthProvider] Retry profile result:', profile)
+            console.log('[AuthProvider] Retry profile result:', profile ? 'found' : 'null')
           }
 
-          if (!profile || !profile.company_id) {
-            console.log('[AuthProvider] Invalid profile after SIGNED_IN')
-            await supabase.auth.signOut().catch(() => {})
-            dispatch(clearUser())
-            return
+          // If profile exists, set it
+          // If still missing, just keep user (DO NOT logout)
+          if (profile) {
+            console.log('[AuthProvider] Setting profile:', profile.id)
+            dispatch(setProfile(profile))
+          } else {
+            console.log('[AuthProvider] Profile still missing - keeping user logged in')
           }
-
-          console.log('[AuthProvider] Setting user and profile from SIGNED_IN')
-          dispatch(setUser(session.user))
-          dispatch(setProfile(profile))
-          console.log('[AuthProvider] SIGNED_IN complete - user:', session.user.id, 'profile:', profile?.company_id)
         }
       }
     )

@@ -14,11 +14,11 @@ export async function fetchProfile(userId) {
   try {
     console.log('[profileService] Fetching profile for userId:', userId)
     
-    const { data, error } = await supabase
+const { data, error } = await supabase
       .from('profiles')
-      .select('*, companies(*)')
+      .select('*')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
     
     if (error) {
       // Log the specific error for debugging
