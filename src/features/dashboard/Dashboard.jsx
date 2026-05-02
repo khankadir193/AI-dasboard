@@ -15,7 +15,8 @@ import { analyticsApi } from '../../lib/analyticsApi'
 export default function Dashboard() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { user, isLoading: isAuthLoading, profile } = useSelector((state) => state.auth)
+  const { user, loading: isAuthLoading } = useSelector((state) => state.auth)
+  const { profile } = useSelector((state) => state.profile)
   const [loading, setLoading] = useState(true)
   const [todos, setTodos] = useState([])
   const [trialInfo, setTrialInfo] = useState({

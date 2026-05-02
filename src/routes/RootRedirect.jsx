@@ -7,18 +7,21 @@ import FullScreenLoader from '../components/common/FullScreenLoader'
  * - Shows loader while loading
  * - Redirects to /dashboard ONLY if authenticated with valid profile
  * - Redirects to /signin if NOT authenticated
+ * 
+ * Profile now comes from profileSlice (single source of truth)
  */
 export default function RootRedirect() {
-  const { user, profile, loading } = useSelector((state) => state.auth)
+  const { user, loading } = useSelector((state) => state.auth)
+  const { profile, isLoading: profileLoading } = useSelector((state) => state.profile)
 
   // Show loader while checking auth
-  if (loading) {
+  if (loading || profileLoading) {
     return <FullScreenLoader />
   }
 
   // ---------------------------------------------------------
   // STRICT CHECK: Must have user AND valid profile with company_id
-  // NEVER trust stale Redux state
+  // Profile comes from profileSlice
   // ---------------------------------------------------------
   if (user && user.id && profile && profile.company_id) {
     console.log('[RootRedirect] Valid user + profile - redirecting to dashboard')

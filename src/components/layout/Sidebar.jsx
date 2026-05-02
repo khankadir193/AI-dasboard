@@ -29,7 +29,8 @@ const authItems = [
 ]
 
 export default function Sidebar({ open, onClose }) {
-  const { user, profile } = useSelector((state) => state.auth)
+  const { user } = useSelector((state) => state.auth)
+  const { profile } = useSelector((state) => state.profile)
   
   const displayName = user?.email?.split('@')[0] || 'User'
   const initials = displayName

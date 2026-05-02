@@ -1,16 +1,16 @@
 import { useEffect, useState, useRef } from 'react'
 import { useDispatch } from 'react-redux'
 import { supabase } from '../lib/supabaseClient'
-import { setUser, setProfile, setLoading, clearUser } from '../store/slices/authSlice'
+import { setUser, setLoading, clearUser } from '../store/slices/authSlice'
+import { clearProfile, fetchUserProfile } from '../store/slices/profileSlice'
 import { clearTenant } from '../store/slices/tenantSlice'
 import { clearProjects } from '../store/slices/projectsSlice'
-import { fetchProfile } from '../services/profileService'
 import FullScreenLoader from '../components/common/FullScreenLoader'
 
 /**
  * AuthProvider - Simplified authentication
- * - Does NOT force logout on missing profile
- * - Profile handling moved to onAuthStateChange
+ * - Auth: only handles user + loading state
+ * - Profile: use async thunk from profileSlice
  * - Always ensures loading completes to prevent UI stuck
  */
 export default function AuthProvider({ children }) {
@@ -23,10 +23,9 @@ export default function AuthProvider({ children }) {
 
     /**
      * initializeAuth - SIMPLIFIED
-     * - ONLY checks session
-     * - Sets user if session exists
+     * - Get session
+     * - If session exists → setUser AND fetchUserProfile (via async thunk)
      * - ALWAYS sets loading=false to prevent stuck UI
-     * - Does NOT fetch profile here
      */
     const initializeAuth = async () => {
       try {
@@ -42,23 +41,30 @@ export default function AuthProvider({ children }) {
         if (!session || sessionError) {
           console.log('[AuthProvider] No valid session, setting loading complete')
           dispatch(clearUser())
+          dispatch(clearProfile())
           dispatch(setLoading(false))
           setIsInitialized(true)
           return
         }
 
-        // Session exists - set user only
+        // Session exists - set user
         console.log('[AuthProvider] Session found for:', session.user.id)
         dispatch(setUser(session.user))
+
+        // Fetch profile via async thunk
+        console.log('[AuthProvider] Fetching profile via thunk...')
+        dispatch(fetchUserProfile(session.user.id))
+
         dispatch(setLoading(false))
         setIsInitialized(true)
 
-        console.log('[AuthProvider] Init complete - user set, loading false')
+        console.log('[AuthProvider] Init complete - user set, loading false, profile fetching')
 
       } catch (error) {
         console.log('[AuthProvider] Init error:', error.message)
         // On any error, still complete loading to prevent stuck
         dispatch(clearUser())
+        dispatch(clearProfile())
         dispatch(setLoading(false))
         setIsInitialized(true)
       }
@@ -77,10 +83,9 @@ export default function AuthProvider({ children }) {
     }, 5000)
 
     /**
-     * onAuthStateChange - HANDLE ALL profile logic here
-     * - SIGNED_IN: setUser, fetchProfile, retry once
+     * onAuthStateChange - Handle auth events
+     * - SIGNED_IN: setUser + fetchUserProfile (async thunk)
      * - SIGNED_OUT: clear all state
-     * - NO forced logout on missing profile
      */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -92,38 +97,22 @@ export default function AuthProvider({ children }) {
         if (event === 'SIGNED_OUT') {
           console.log('[AuthProvider] Signed out - clearing all state')
           dispatch(clearUser())
+          dispatch(clearProfile())
           dispatch(clearTenant())
           dispatch(clearProjects())
           return
         }
 
-        // SIGNED_IN - handle profile with retry logic
+        // SIGNED_IN - set user and dispatch profile fetch
         if (event === 'SIGNED_IN' && session && session.user) {
           console.log('[AuthProvider] SIGNED_IN for:', session.user.id)
 
           // Always set user first
           dispatch(setUser(session.user))
 
-          // Fetch profile
-          let profile = await fetchProfile(session.user.id).catch(() => null)
-          console.log('[AuthProvider] Profile fetch result:', profile ? 'found' : 'null')
-
-          // Retry once after 500ms if profile missing
-          if (!profile) {
-            console.log('[AuthProvider] Profile missing, retrying in 500ms...')
-            await new Promise(res => setTimeout(res, 500))
-            profile = await fetchProfile(session.user.id).catch(() => null)
-            console.log('[AuthProvider] Retry profile result:', profile ? 'found' : 'null')
-          }
-
-          // If profile exists, set it
-          // If still missing, just keep user (DO NOT logout)
-          if (profile) {
-            console.log('[AuthProvider] Setting profile:', profile.id)
-            dispatch(setProfile(profile))
-          } else {
-            console.log('[AuthProvider] Profile still missing - keeping user logged in')
-          }
+          // Fetch profile via async thunk
+          console.log('[AuthProvider] Dispatching fetchUserProfile thunk...')
+          dispatch(fetchUserProfile(session.user.id))
         }
       }
     )

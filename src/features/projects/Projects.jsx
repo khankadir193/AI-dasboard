@@ -34,7 +34,8 @@ import {
 
 export default function Projects() {
   const dispatch = useDispatch()
-  const { profile, isLoading: authLoading } = useSelector((state) => state.auth)
+  const { user, loading: authLoading } = useSelector((state) => state.auth)
+  const { profile, isLoading: profileLoading } = useSelector((state) => state.profile)
 
   // Redux state
   const projects = useSelector(selectProjects)
@@ -57,7 +58,7 @@ export default function Projects() {
   const inputRef = useRef(null)
   const modalRef = useRef(null)
 
-  const companyId = profile?.company_id
+const companyId = profile?.company_id
 
   // Permission checks
   const { isAllowed: canCreate } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_CREATE })
@@ -65,10 +66,10 @@ export default function Projects() {
   const { isAllowed: canDelete, tooltip: deleteTooltip } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_DELETE })
 
   // ============================
-  // Fetch projects on mount / when auth ready
+  // Fetch projects on mount / when auth and profile ready
   // ============================
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !profileLoading) {
       if (companyId) {
         dispatch(fetchProjects(filters))
       } else {
@@ -78,11 +79,11 @@ export default function Projects() {
     }
   }, [dispatch, authLoading, companyId])
 
-  // ============================
+// ============================
   // Refetch when filters change
   // ============================
   useEffect(() => {
-    if (!authLoading && companyId) {
+    if (!authLoading && !profileLoading && companyId) {
       const timer = setTimeout(() => {
         dispatch(fetchProjects(filters))
       }, 300) // Debounce search
