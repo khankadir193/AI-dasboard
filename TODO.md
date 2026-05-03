@@ -1,20 +1,27 @@
-# TODO - Auth Refactoring
+# TODO - Projects Refactoring
 
-## Task: Fix login/signup stuck issue + State Management
+## Task: Refactor Projects feature into reusable components
 
 ### Steps:
-- [x] 1. Fix profileService.js - Remove join
-- [x] 2. Fix AuthProvider.jsx - Use async thunk for profile
-- [x] 3. Fix authSlice.js - Remove profile (only user + loading)
-- [x] 4. Fix ProtectedRoute.jsx - Use profileSlice
-- [x] 5. Fix RootRedirect.jsx - Use profileSlice
-- [x] 6. Fix Projects.jsx - Wait for profile
-- [x] 7. Fix Dashboard.jsx - Use profileSlice
-- [x] 8. Fix Sidebar.jsx - Use profileSlice
-- [x] 9. Verify build
+- [x] 1. profileService.js - Remove join
+- [x] 2. AuthProvider.jsx - Simplify initializeAuth()
+- [x] 3. ProjectsFilters.jsx - Extract search/filter/refresh
+- [x] 4. ProjectsTable.jsx - Extract table component
+- [x] 5. ProjectForm.jsx - Extract form component
+- [x] 6. AddProjectModal.jsx - Extract add modal
+- [x] 7. EditProjectModal.jsx - Extract edit modal
+- [x] 8. Projects.jsx - Use new components
+- [x] 9. Build verified
 
 ## Status: COMPLETED
-✅ Build successful
-✅ Clean separation: auth (user) + profile (profile)
-✅ Profile from profileSlice via async thunk
-✅ All components updated to use state.profile.profile
+✅ Build: 8.55s
+✅ UI structure:
+src/features/projects/
+├── Projects.jsx              <- Main container (all state/dispatch)
+├── components/
+│   ├── ProjectForm.jsx    <- Reusable form
+│   ├── ProjectsFilters.jsx <- Search/filter UI
+│   └── ProjectsTable.jsx  <- Table UI
+└── modals/
+    ├── AddProjectModal.jsx
+    └── EditProjectModal.jsx

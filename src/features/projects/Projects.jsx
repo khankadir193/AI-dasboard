@@ -1,16 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
-import {
-  Plus,
-  Trash2,
-  Calendar,
-  Activity,
-  X,
-  Edit,
-  Search,
-  Filter,
-  RefreshCw
-} from 'lucide-react'
+import { Plus, X, RefreshCw } from 'lucide-react'
 import PermissionButton from '../../components/auth/PermissionButton.jsx'
 import { usePermission } from '../../hooks/usePermission'
 import { PERMISSIONS } from '../../utils/permissions'
@@ -31,6 +21,15 @@ import {
   selectDeletingId,
   selectIsUpdating
 } from '../../store/slices/projectsSlice'
+
+// Components
+import ProjectsFilters from './components/ProjectsFilters'
+import ProjectsTable from './components/ProjectsTable'
+import AddProjectModal from './modals/AddProjectModal'
+import EditProjectModal from './modals/EditProjectModal'
+
+// Common components
+import ErrorAlert from '../../components/common/ErrorAlert'
 
 export default function Projects() {
   const dispatch = useDispatch()
@@ -58,7 +57,7 @@ export default function Projects() {
   const inputRef = useRef(null)
   const modalRef = useRef(null)
 
-const companyId = profile?.company_id
+  const companyId = profile?.company_id
 
   // Permission checks
   const { isAllowed: canCreate } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_CREATE })
@@ -73,20 +72,19 @@ const companyId = profile?.company_id
       if (companyId) {
         dispatch(fetchProjects(filters))
       } else {
-        // Clear stale projects when companyId is missing to prevent data flicker
         dispatch(clearProjects())
       }
     }
   }, [dispatch, authLoading, companyId])
 
-// ============================
-  // Refetch when filters change
+  // ============================
+  // Refetch when filters change (debounced 300ms)
   // ============================
   useEffect(() => {
     if (!authLoading && !profileLoading && companyId) {
       const timer = setTimeout(() => {
         dispatch(fetchProjects(filters))
-      }, 300) // Debounce search
+      }, 300)
       return () => clearTimeout(timer)
     }
   }, [dispatch, authLoading, companyId, filters.status, filters.search])
@@ -236,48 +234,6 @@ const companyId = profile?.company_id
     dispatch(fetchProjects(filters))
   }
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString()
-  }
-
-  // ============================
-  // Guarded icon button helper
-  // ============================
-  function GuardedIconButton({ onClick, disabled, isAllowed, tooltip, className, children, ariaLabel }) {
-    const isDisabled = disabled || !isAllowed
-
-    const handleClick = (e) => {
-      if (isDisabled) {
-        e.preventDefault()
-        e.stopPropagation()
-        return
-      }
-      onClick(e)
-    }
-
-    const button = (
-      <button
-        onClick={handleClick}
-        disabled={isDisabled}
-        className={className}
-        aria-label={ariaLabel}
-      >
-        {children}
-      </button>
-    )
-
-    if (isDisabled && tooltip) {
-      return (
-        <span className="inline-block" title={tooltip} style={{ cursor: 'not-allowed' }}>
-          {button}
-        </span>
-      )
-    }
-
-    return button
-  }
-
   // ============================
   // Render: Auth loading
   // ============================
@@ -373,341 +329,56 @@ const companyId = profile?.company_id
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by project name..."
-            value={filters.search}
-            onChange={(e) => dispatch(setSearchQuery(e.target.value))}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-
-        {/* Status Filter */}
-        <div className="relative sm:w-48">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <select
-            value={filters.status}
-            onChange={(e) => dispatch(setStatusFilter(e.target.value))}
-            className="w-full pl-10 pr-8 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white appearance-none"
-          >
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
-
-        {/* Refresh */}
-        <button
-          onClick={handleRefresh}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
-          title="Refresh projects"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
-      </div>
+      <ProjectsFilters
+        search={filters.search}
+        status={filters.status}
+        onSearchChange={(value) => dispatch(setSearchQuery(value))}
+        onStatusChange={(value) => dispatch(setStatusFilter(value))}
+        onRefresh={handleRefresh}
+        loading={loading}
+      />
 
       {/* Inline error */}
       {error && projects.length > 0 && (
-        <div className="p-3 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg flex items-center justify-between">
-          <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
-          <button
-            onClick={() => dispatch(clearProjectsError())}
-            className="text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <ErrorAlert message={error} onClose={() => dispatch(clearProjectsError())} />
       )}
 
       {/* Projects Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {projects.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                    <div className="flex flex-col items-center">
-                      <Activity className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-4" />
-                      <p className="font-medium">No projects found</p>
-                      <p className="text-sm mt-2">
-                        {filters.search || filters.status
-                          ? 'Try adjusting your filters'
-                          : 'Create your first project to get started'}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                projects.map((project) => (
-                  <tr key={project.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {project.name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          project.status === 'active'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
-                        }`}
-                      >
-                        {project.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(project.created_at)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2">
-                        <GuardedIconButton
-                          onClick={() => handleEditProject(project)}
-                          disabled={updating}
-                          isAllowed={canUpdate}
-                          tooltip={updateTooltip}
-                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          ariaLabel={`Edit project ${project.name}`}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </GuardedIconButton>
-                        <GuardedIconButton
-                          onClick={() => handleDeleteProject(project.id, project.name)}
-                          disabled={deletingId === project.id}
-                          isAllowed={canDelete}
-                          tooltip={deleteTooltip}
-                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          ariaLabel={`Delete project ${project.name}`}
-                        >
-                          {deletingId === project.id ? (
-                            <div className="animate-spin h-4 w-4 border-2 border-red-600 border-t-transparent rounded-full"></div>
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </GuardedIconButton>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ProjectsTable
+        projects={projects}
+        deletingId={deletingId}
+        onEdit={handleEditProject}
+        onDelete={handleDeleteProject}
+        canUpdate={canUpdate}
+        canDelete={canDelete}
+        updateTooltip={updateTooltip}
+        deleteTooltip={deleteTooltip}
+      />
 
-      {/* Add Project Modal */}
-      {showAddModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeAddModal()
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-title"
-        >
-          <div
-            ref={modalRef}
-            className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 id="modal-title" className="text-lg font-semibold text-gray-900 dark:text-white">
-                Add New Project
-              </h2>
-              <button
-                onClick={closeAddModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                aria-label="Close modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      {/* Modals */}
+      <AddProjectModal
+        isOpen={showAddModal}
+        projectName={newProjectName}
+        formError={formError}
+        onNameChange={setNewProjectName}
+        onSubmit={handleAddProject}
+        onCancel={closeAddModal}
+        isCreating={creating}
+        inputRef={inputRef}
+        modalRef={modalRef}
+      />
 
-            {formError && (
-              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg">
-                <p className="text-red-700 dark:text-red-300 text-sm">{formError}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleAddProject}>
-              <div className="mb-4">
-                <label
-                  htmlFor="project-name"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                >
-                  Project Name
-                </label>
-                <input
-                  id="project-name"
-                  ref={inputRef}
-                  type="text"
-                  value={newProjectName}
-                  onChange={(e) => {
-                    setNewProjectName(e.target.value)
-                    setFormError('')
-                  }}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white ${
-                    formError
-                      ? 'border-red-300 dark:border-red-700'
-                      : 'border-gray-300 dark:border-gray-600'
-                  }`}
-                  placeholder="Enter project name"
-                  aria-describedby={formError ? 'project-name-error' : undefined}
-                  maxLength={100}
-                  required
-                />
-                {formError && (
-                  <p id="project-name-error" className="mt-2 text-sm text-red-600 dark:text-red-400">
-                    {formError}
-                  </p>
-                )}
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  2-100 characters, letters, numbers, spaces, hyphens, and underscores only
-                </p>
-              </div>
-              <div className="flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={closeAddModal}
-                  disabled={creating}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Cancel
-                </button>
-                <PermissionButton
-                  type="submit"
-                  requiredPermission={PERMISSIONS.PROJECTS_CREATE}
-                  variant="primary"
-                  disabled={creating || !newProjectName.trim()}
-                  loading={creating}
-                >
-                  {creating ? 'Creating...' : 'Create Project'}
-                </PermissionButton>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Project Modal */}
-      {showEditModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeEditModal()
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="edit-modal-title"
-        >
-          <div
-            ref={modalRef}
-            className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 id="edit-modal-title" className="text-lg font-semibold text-gray-900 dark:text-white">
-                Edit Project
-              </h2>
-              <button
-                onClick={closeEditModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                aria-label="Close modal"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {formError && (
-              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg">
-                <p className="text-red-700 dark:text-red-300 text-sm">{formError}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleUpdateProject}>
-              <div className="mb-4">
-                <label
-                  htmlFor="edit-project-name"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                >
-                  Project Name
-                </label>
-                <input
-                  id="edit-project-name"
-                  ref={inputRef}
-                  type="text"
-                  value={editProjectName}
-                  onChange={(e) => {
-                    setEditProjectName(e.target.value)
-                    setFormError('')
-                  }}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white ${
-                    formError
-                      ? 'border-red-300 dark:border-red-700'
-                      : 'border-gray-300 dark:border-gray-600'
-                  }`}
-                  placeholder="Enter project name"
-                  disabled={updating}
-                  maxLength={100}
-                />
-                {formError && (
-                  <p className="mt-2 text-sm text-red-600 dark:text-red-400">{formError}</p>
-                )}
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  2-100 characters, letters, numbers, spaces, hyphens, and underscores only
-                </p>
-              </div>
-              <div className="flex gap-3 justify-end">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  disabled={updating}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Cancel
-                </button>
-                <PermissionButton
-                  type="submit"
-                  requiredPermission={PERMISSIONS.PROJECTS_UPDATE}
-                  variant="primary"
-                  disabled={updating || !editProjectName.trim()}
-                  loading={updating}
-                >
-                  {updating ? 'Updating...' : 'Update Project'}
-                </PermissionButton>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <EditProjectModal
+        isOpen={showEditModal}
+        projectName={editProjectName}
+        formError={formError}
+        onNameChange={setEditProjectName}
+        onSubmit={handleUpdateProject}
+        onCancel={closeEditModal}
+        isUpdating={updating}
+        inputRef={inputRef}
+        modalRef={modalRef}
+      />
     </div>
   )
 }
-
