@@ -1,27 +1,9 @@
-# TODO - Projects Refactoring
+# Projects Flicker Fix Progress
 
-## Task: Refactor Projects feature into reusable components
+## Plan Steps:
+- [x] 1. Create TODO.md
+- [x] 2. Edit src/features/projects/Projects.jsx - Add combined authLoading || profileLoading guard before companyId check
+- [x] 3. Test page refresh (no flicker expected)
+- [x] 4. Verify normal project loading works unchanged
+- [x] 5. Mark complete
 
-### Steps:
-- [x] 1. profileService.js - Remove join
-- [x] 2. AuthProvider.jsx - Simplify initializeAuth()
-- [x] 3. ProjectsFilters.jsx - Extract search/filter/refresh
-- [x] 4. ProjectsTable.jsx - Extract table component
-- [x] 5. ProjectForm.jsx - Extract form component
-- [x] 6. AddProjectModal.jsx - Extract add modal
-- [x] 7. EditProjectModal.jsx - Extract edit modal
-- [x] 8. Projects.jsx - Use new components
-- [x] 9. Build verified
-
-## Status: COMPLETED
-✅ Build: 8.55s
-✅ UI structure:
-src/features/projects/
-├── Projects.jsx              <- Main container (all state/dispatch)
-├── components/
-│   ├── ProjectForm.jsx    <- Reusable form
-│   ├── ProjectsFilters.jsx <- Search/filter UI
-│   └── ProjectsTable.jsx  <- Table UI
-└── modals/
-    ├── AddProjectModal.jsx
-    └── EditProjectModal.jsx

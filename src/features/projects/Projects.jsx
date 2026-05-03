@@ -235,14 +235,14 @@ export default function Projects() {
   }
 
   // ============================
-  // Render: Auth loading
+  // Render: Auth/Profile loading
   // ============================
-  if (authLoading) {
+  if (authLoading || profileLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Authenticating...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     )
