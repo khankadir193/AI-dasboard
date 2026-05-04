@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import {
   LayoutDashboard,
   BarChart3,
@@ -12,15 +13,14 @@ import {
   FolderKanban,
 } from 'lucide-react'
 import clsx from 'clsx'
-import { useAuth } from '../../context/AuthContext'
 
 const navItems = [
-  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard'   },
-  { to: '/dashboard/analytics',  icon: BarChart3,        label: 'Analytics'   },
-  { to: '/dashboard/ai-insights', icon: Sparkles,         label: 'AI Insights' },
-  { to: '/dashboard/data-table',  icon: Table2,           label: 'Data Table'  },
-  { to: '/dashboard/projects',    icon: FolderKanban,    label: 'Projects'    },
-  { to: '/dashboard/settings',    icon: Settings,         label: 'Settings'    },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+  { to: '/ai-insights', icon: Sparkles, label: 'AI Insights' },
+  { to: '/data-table', icon: Table2, label: 'Data Table' },
+  { to: '/projects', icon: FolderKanban, label: 'Projects' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
 const authItems = [
@@ -29,7 +29,17 @@ const authItems = [
 ]
 
 export default function Sidebar({ open, onClose }) {
-  const { displayName, email, initials } = useAuth()
+  const { user } = useSelector((state) => state.auth)
+  const { profile } = useSelector((state) => state.profile)
+  
+  const displayName = user?.email?.split('@')[0] || 'User'
+  const initials = displayName
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+  const email = user?.email || ''
 
   return (
     <>

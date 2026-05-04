@@ -18,6 +18,9 @@ export default function SignUp() {
     setInfo('')
     setIsSubmitting(true)
 
+    console.log('Signup data:', { email, companyName })
+    console.log('Metadata to send:', { company_name: companyName })
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -26,6 +29,8 @@ export default function SignUp() {
       },
     })
 
+    console.log('Signup result:', { data, signUpError })
+
     setIsSubmitting(false)
 
     if (signUpError) {
@@ -33,15 +38,17 @@ export default function SignUp() {
       return
     }
 
-    // Tenant provisioning is handled centrally in AuthContext to avoid
+    // Tenant provisioning is handled centrally in App.jsx AuthProvider to avoid
     // duplicate inserts caused by multiple concurrent signup/auth events.
 
     if (!data?.session) {
+      console.log('No session after signup - email verification required')
       setInfo('Account created. Check your email to confirm, then sign in. Company and profile will be created automatically on first login.')
-      return
     }
 
-    navigate('/dashboard', { replace: true })
+    console.log('Redirecting to signin after signup')
+    // Always redirect to signin after signup
+    navigate('/signin', { replace: true })
   }
 
   return (

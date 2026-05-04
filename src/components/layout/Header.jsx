@@ -1,7 +1,12 @@
 import { Menu, Bell, Sun, Moon, Search } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
+import { useSelector, useDispatch } from 'react-redux'
+import { supabase } from '../../lib/supabaseClient'
+import { clearUser } from '../../store/slices/authSlice'
+import { clearProfile } from '../../store/slices/profileSlice'
+import { clearTenant } from '../../store/slices/tenantSlice'
+import { clearProjects } from '../../store/slices/projectsSlice'
 
 const pageTitles = {
   '/dashboard':   { title: 'Dashboard',    subtitle: 'Welcome back, John Doe' },
@@ -13,15 +18,33 @@ const pageTitles = {
 
 export default function Header({ onMenuClick }) {
   const { theme, toggleTheme } = useTheme()
-  const { displayName, signOut, isSigningOut } = useAuth()
+  const dispatch = useDispatch()
+  const { user, loading } = useSelector((state) => state.auth)
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const page = pageTitles[pathname] || { title: 'Dashboard', subtitle: '' }
+  
+  const displayName = user?.email?.split('@')[0] || 'User'
   const subtitle = pathname === '/dashboard' ? `Welcome back, ${displayName}` : page.subtitle
 
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/signin', { replace: true })
+    try {
+      // Clear Redux state first (for immediate UI response)
+      dispatch(clearUser())
+      dispatch(clearProfile())
+      dispatch(clearTenant())
+      dispatch(clearProjects())
+      
+      // Then sign out from Supabase
+      await supabase.auth.signOut()
+      
+      // Navigate to login
+      navigate('/signin', { replace: true })
+    } catch (error) {
+      console.error('Sign out error:', error)
+      // Navigate anyway
+      navigate('/signin', { replace: true })
+    }
   }
 
   return (
@@ -59,10 +82,10 @@ export default function Header({ onMenuClick }) {
         </button>
         <button
           onClick={handleSignOut}
-          disabled={isSigningOut}
+          disabled={loading}
           className="ml-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-60"
         >
-          {isSigningOut ? 'Signing out...' : 'Sign out'}
+          {loading ? 'Signing out...' : 'Sign out'}
         </button>
       </div>
     </header>

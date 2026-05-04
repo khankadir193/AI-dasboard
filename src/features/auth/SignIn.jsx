@@ -32,8 +32,6 @@ export default function SignIn() {
       setInfo('Sign-in succeeded but no active session was created. Please try again.')
       return
     }
-
-    navigate('/dashboard', { replace: true })
   }
 
   return (
