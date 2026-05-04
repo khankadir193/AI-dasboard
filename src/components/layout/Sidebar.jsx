@@ -15,12 +15,12 @@ import {
 import clsx from 'clsx'
 
 const navItems = [
-  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard'   },
-  { to: '/dashboard/analytics',  icon: BarChart3,        label: 'Analytics'   },
-  { to: '/dashboard/ai-insights', icon: Sparkles,         label: 'AI Insights' },
-  { to: '/dashboard/data-table',  icon: Table2,           label: 'Data Table'  },
-  { to: '/dashboard/projects',    icon: FolderKanban,    label: 'Projects'    },
-  { to: '/dashboard/settings',    icon: Settings,         label: 'Settings'    },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+  { to: '/ai-insights', icon: Sparkles, label: 'AI Insights' },
+  { to: '/data-table', icon: Table2, label: 'Data Table' },
+  { to: '/projects', icon: FolderKanban, label: 'Projects' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
 const authItems = [

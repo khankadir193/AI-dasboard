@@ -28,13 +28,13 @@ export default function App() {
         <Route path="/register" element={<Navigate to="/signup" replace />} />
         <Route path="/signin" element={<PublicOnlyRoute><SignIn /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><SignUp /></PublicOnlyRoute>} />
-        <Route path="/dashboard" element={<PrivateRoute><Layout /></PrivateRoute>}>
-          <Route index element={<Dashboard />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="ai-insights" element={<AIInsights />} />
-          <Route path="data-table" element={<DataTable />} />
-          <Route path="projects" element={<Projects />} />
-          <Route path="settings" element={<Settings />} />
+        <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/ai-insights" element={<AIInsights />} />
+          <Route path="/data-table" element={<DataTable />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

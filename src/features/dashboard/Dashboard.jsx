@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { Loader2 } from 'lucide-react'
 
@@ -14,7 +14,6 @@ import TasksList from './components/Tasks/TasksList'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { pathname } = useLocation()
   const { user, loading: isAuthLoading } = useSelector((state) => state.auth)
   const { profile } = useSelector((state) => state.profile)
   
@@ -24,14 +23,6 @@ export default function Dashboard() {
   // Hooks for extracted logic
   const { analyticsData } = useAnalytics()
   const { trialInfo } = useTrial()
-  
-  const tabs = [
-    { to: '/dashboard', label: 'Overview' },
-    { to: '/dashboard/analytics', label: 'Analytics' },
-    { to: '/dashboard/ai-insights', label: 'AI Insights' },
-    { to: '/dashboard/data-table', label: 'Data Table' },
-    { to: '/dashboard/settings', label: 'Settings' },
-  ]
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -87,25 +78,6 @@ export default function Dashboard() {
             : `Trial active: ${trialInfo.daysLeft} day${trialInfo.daysLeft === 1 ? '' : 's'} remaining.`}
         </div>
       )}
-
-      <div className="flex flex-wrap gap-2">
-        {tabs.map((tab) => {
-          const isActive = pathname === tab.to
-          return (
-            <Link
-              key={tab.to}
-              to={tab.to}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-              }`}
-            >
-              {tab.label}
-            </Link>
-          )
-        })}
-      </div>
 
       {/* KPI Section */}
       <KPISection kpiData={analyticsData.kpiData} />
