@@ -60,10 +60,10 @@ export const fetchProjects = async (filters = {}) => {
 
   // 3. Build query with tenant isolation
   let query = supabase
-    .from('projects')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false })
+  .from('projects')
+  .select('*')
+  .eq('company_id', companyId)
+  .order('created_at', { ascending: false })
 
   // 4. Apply optional filters
   if (filters.status && ['active', 'inactive'].includes(filters.status)) {
@@ -114,7 +114,8 @@ export const createProject = async (name) => {
     .insert({
       name: name.trim(),
       company_id: profile.company_id,
-      status: 'active'
+      status: 'active',
+      created_by: profile.id
     })
     .select()
     .maybeSingle()
