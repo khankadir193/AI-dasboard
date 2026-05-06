@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { supabase } from '../lib/supabaseClient'
 import { setUser, setLoading, clearUser } from '../store/slices/authSlice'
 import { clearProfile, fetchUserProfile } from '../store/slices/profileSlice'
 import { clearTenant } from '../store/slices/tenantSlice'
 import { clearProjects } from '../store/slices/projectsSlice'
 import FullScreenLoader from '../components/common/FullScreenLoader'
+import { trackEvent } from '../features/analytics/trackEvent'
 
 /**
  * AuthProvider - Simplified authentication
@@ -17,6 +18,9 @@ export default function AuthProvider({ children }) {
   const dispatch = useDispatch()
   const [isInitialized, setIsInitialized] = useState(false)
   const timeoutRef = useRef(null)
+  const { user } = useSelector((state) => state.auth)
+  const { profile } = useSelector((state) => state.profile)
+  const hasTrackedLogin = useRef(false)
 
   useEffect(() => {
     let isMounted = true
@@ -125,6 +129,21 @@ export default function AuthProvider({ children }) {
       subscription.unsubscribe()
     }
   }, [dispatch])
+
+  // Track login analytics when user and profile are available
+  useEffect(() => {
+    if (user && profile?.company_id && !hasTrackedLogin.current) {
+      console.log('[AuthProvider] Tracking login analytics, companyId:', profile.company_id)
+      trackEvent({
+        companyId: profile.company_id,
+        type: 'active_users',
+        value: 1
+      }).catch(error => {
+        console.error('[AuthProvider] Analytics tracking failed:', error.message)
+      })
+      hasTrackedLogin.current = true
+    }
+  }, [user, profile])
 
   if (!isInitialized) {
     return <FullScreenLoader />

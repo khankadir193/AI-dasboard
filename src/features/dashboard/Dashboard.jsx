@@ -11,6 +11,7 @@ import RevenueChart from './components/Charts/RevenueChart'
 import UsersChart from './components/Charts/UsersChart'
 import ProjectStatusChart from './components/Charts/ProjectStatusChart'
 import TasksList from './components/Tasks/TasksList'
+import { trackEvent } from '../analytics/trackEvent'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -29,6 +30,22 @@ export default function Dashboard() {
       navigate('/signin', { replace: true })
     }
   }, [isAuthLoading, user, navigate])
+
+  // Track dashboard view analytics once when profile is loaded
+  useEffect(() => {
+    if (profile?.company_id) {
+      console.log('[Dashboard] Tracking dashboard view, companyId:', profile.company_id)
+      trackEvent({
+        companyId: profile.company_id,
+        type: 'dashboard_view',
+        value: 1
+      }).catch(error => {
+        console.error('[Dashboard] Analytics tracking failed:', error.message)
+      })
+    }
+    // Empty dependency array ensures this runs only once per session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     // Simulate loading for todos

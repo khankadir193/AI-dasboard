@@ -187,6 +187,8 @@ class AnalyticsApiService {
   }
 
   // Generate sample data for demo purposes
+  // DISABLED - Analytics must use ONLY real event-based tracking
+  /*
   async generateSampleData() {
     if (!this.currentCompanyId) return
 
@@ -249,6 +251,7 @@ class AnalyticsApiService {
       throw error
     }
   }
+  */
 }
 
 export const analyticsApi = new AnalyticsApiService()

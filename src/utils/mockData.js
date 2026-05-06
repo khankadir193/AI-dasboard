@@ -1,6 +1,13 @@
 import { subDays, format } from 'date-fns'
 
+// ============================================
+// MOCK DATA GENERATORS - DISABLED FOR PRODUCTION
+// Analytics must use ONLY real event-based tracking
+// ============================================
+
 // Generate last N days of revenue data
+// DISABLED - Use real analytics_data from Supabase instead
+/*
 export function generateRevenueData(days = 30) {
   return Array.from({ length: days }, (_, i) => {
     const date = subDays(new Date(), days - 1 - i)
@@ -11,8 +18,11 @@ export function generateRevenueData(days = 30) {
     }
   })
 }
+*/
 
 // Generate user growth data
+// DISABLED - Use real analytics_data from Supabase instead
+/*
 export function generateUserData(months = 12) {
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
   let users = 1200
@@ -25,8 +35,11 @@ export function generateUserData(months = 12) {
     }
   })
 }
+*/
 
 // Category distribution
+// DISABLED - Use real analytics_data from Supabase instead
+/*
 export function generateCategoryData() {
   return [
     { name: 'Enterprise', value: 4200, fill: '#3b82f6' },
@@ -35,6 +48,7 @@ export function generateCategoryData() {
     { name: 'Trial', value: 900, fill: '#f59e0b' },
   ]
 }
+*/
 
 // Format currency
 export function formatCurrency(value) {
