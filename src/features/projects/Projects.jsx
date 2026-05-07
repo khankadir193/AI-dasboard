@@ -4,6 +4,7 @@ import { Plus, X, RefreshCw } from 'lucide-react'
 import PermissionButton from '../../components/auth/PermissionButton.jsx'
 import { usePermission } from '../../hooks/usePermission'
 import { PERMISSIONS } from '../../utils/permissions'
+import { trackEvent } from '../analytics/trackEvent'
 import {
   fetchProjects,
   createProject,
@@ -224,6 +225,16 @@ export default function Projects() {
     )
 
     if (updateProject.fulfilled.match(resultAction)) {
+      // Track analytics only after successful update
+      if (companyId) {
+        trackEvent({
+          companyId,
+          type: 'projects_updated',
+          value: 1
+        })
+        console.log('[Analytics] Project updated tracked')
+      }
+
       closeEditModal()
     } else {
       setFormError(resultAction.payload || 'Failed to update project')

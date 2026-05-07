@@ -14,6 +14,7 @@ export default function Analytics() {
   const [eventCounts, setEventCounts] = useState({
     activeUsers: 0,
     projectsCreated: 0,
+    projectsUpdated: 0,
     projectsDeleted: 0,
     dashboardViews: 0
   })
@@ -33,9 +34,16 @@ export default function Analytics() {
       setError(null)
 
       // Fetch real data from Supabase - query actual tracked event types
-      const [activeUsers, projectsCreated, projectsDeleted, dashboardViews] = await Promise.all([
+      const [
+        activeUsers,
+        projectsCreated,
+        projectsUpdated,
+        projectsDeleted,
+        dashboardViews
+      ] = await Promise.all([
         analyticsApi.fetchAnalyticsData('active_users', 30),
         analyticsApi.fetchAnalyticsData('projects_created', 30),
+        analyticsApi.fetchAnalyticsData('projects_updated', 30),
         analyticsApi.fetchAnalyticsData('projects_deleted', 30),
         analyticsApi.fetchAnalyticsData('dashboard_view', 30)
       ])
@@ -44,6 +52,7 @@ export default function Analytics() {
       setEventCounts({
         activeUsers: activeUsers.reduce((sum, item) => sum + (item.metric_value || 1), 0),
         projectsCreated: projectsCreated.reduce((sum, item) => sum + (item.metric_value || 1), 0),
+        projectsUpdated: projectsUpdated.reduce((sum, item) => sum + (item.metric_value || 1), 0),
         projectsDeleted: projectsDeleted.reduce((sum, item) => sum + (item.metric_value || 1), 0),
         dashboardViews: dashboardViews.reduce((sum, item) => sum + (item.metric_value || 1), 0)
       })
@@ -52,6 +61,7 @@ export default function Analytics() {
       const allEvents = [
         ...activeUsers.map(item => ({ ...item, label: 'Login' })),
         ...projectsCreated.map(item => ({ ...item, label: 'Project Created' })),
+        ...projectsUpdated.map(item => ({ ...item, label: 'Project Updated' })),
         ...projectsDeleted.map(item => ({ ...item, label: 'Project Deleted' })),
         ...dashboardViews.map(item => ({ ...item, label: 'Dashboard View' }))
       ]
@@ -142,6 +152,10 @@ export default function Analytics() {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects Created</span>
               <span className="text-sm font-bold text-green-600 dark:text-green-400">{eventCounts.projectsCreated}</span>
             </div>
+            <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects Updated</span>
+              <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{eventCounts.projectsUpdated}</span>
+            </div>
             <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects Deleted</span>
               <span className="text-sm font-bold text-red-600 dark:text-red-400">{eventCounts.projectsDeleted}</span>
@@ -159,7 +173,13 @@ export default function Analytics() {
         <div className="card text-center">
           <p className="text-sm text-gray-500">Total Events Tracked</p>
           <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
-            {eventCounts.activeUsers + eventCounts.projectsCreated + eventCounts.projectsDeleted + eventCounts.dashboardViews}
+            {
+              eventCounts.activeUsers +
+              eventCounts.projectsCreated +
+              eventCounts.projectsUpdated +
+              eventCounts.projectsDeleted +
+              eventCounts.dashboardViews
+            }
           </p>
           <p className="text-xs text-gray-400 mt-1">Real user activity</p>
         </div>
