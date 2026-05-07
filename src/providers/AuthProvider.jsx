@@ -34,7 +34,6 @@ export default function AuthProvider({ children }) {
     const initializeAuth = async () => {
       try {
         dispatch(setLoading(true))
-        console.log('[AuthProvider] Checking for existing session...')
 
         // Get session only
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -43,7 +42,6 @@ export default function AuthProvider({ children }) {
 
         // If no session or error - clear and finish
         if (!session || sessionError) {
-          console.log('[AuthProvider] No valid session, setting loading complete')
           dispatch(clearUser())
           dispatch(clearProfile())
           dispatch(setLoading(false))
@@ -52,20 +50,15 @@ export default function AuthProvider({ children }) {
         }
 
         // Session exists - set user
-        console.log('[AuthProvider] Session found for:', session.user.id)
         dispatch(setUser(session.user))
 
         // Fetch profile via async thunk
-        console.log('[AuthProvider] Fetching profile via thunk...')
         dispatch(fetchUserProfile(session.user.id))
 
         dispatch(setLoading(false))
         setIsInitialized(true)
 
-        console.log('[AuthProvider] Init complete - user set, loading false, profile fetching')
-
       } catch (error) {
-        console.log('[AuthProvider] Init error:', error.message)
         // On any error, still complete loading to prevent stuck
         dispatch(clearUser())
         dispatch(clearProfile())
@@ -80,7 +73,6 @@ export default function AuthProvider({ children }) {
     // Timeout fallback - ensures we never get stuck
     timeoutRef.current = setTimeout(() => {
       if (!isInitialized) {
-        console.log('[AuthProvider] Timeout - forcing load complete')
         dispatch(setLoading(false))
         setIsInitialized(true)
       }
@@ -95,11 +87,8 @@ export default function AuthProvider({ children }) {
       async (event, session) => {
         if (!isMounted) return
 
-        console.log('[AuthProvider] Auth event:', event)
-
         // SIGNED_OUT - clear everything
         if (event === 'SIGNED_OUT') {
-          console.log('[AuthProvider] Signed out - clearing all state')
           loginTrackedRef.current = false
           dispatch(clearUser())
           dispatch(clearProfile())
@@ -110,13 +99,10 @@ export default function AuthProvider({ children }) {
 
         // SIGNED_IN - set user and dispatch profile fetch
         if (event === 'SIGNED_IN' && session && session.user) {
-          console.log('[AuthProvider] SIGNED_IN for:', session.user.id)
-
           // Always set user first
           dispatch(setUser(session.user))
 
           // Fetch profile via async thunk
-          console.log('[AuthProvider] Dispatching fetchUserProfile thunk...')
           dispatch(fetchUserProfile(session.user.id))
         }
       }
@@ -145,8 +131,6 @@ export default function AuthProvider({ children }) {
 
     // lock immediately
     loginTrackedRef.current = true
-
-    console.log('[AuthProvider] Tracking active_users:', profile.company_id)
 
     trackEvent({
       companyId: profile.company_id,

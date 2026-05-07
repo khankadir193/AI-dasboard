@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { Loader2 } from 'lucide-react'
@@ -7,10 +7,10 @@ import { Loader2 } from 'lucide-react'
 import { useAnalytics } from './hooks/useAnalytics'
 import { useTrial } from './hooks/useTrial'
 import KPISection from './components/KPI/KPISection'
-import RevenueChart from './components/Charts/RevenueChart'
+import ActivityTimelineChart from './components/Charts/ActivityTimelineChart'
 import UsersChart from './components/Charts/UsersChart'
 import ProjectStatusChart from './components/Charts/ProjectStatusChart'
-import TasksList from './components/Tasks/TasksList'
+import RecentActivityFeed from './components/ActivityFeed/RecentActivityFeed'
 import { trackEvent } from '../analytics/trackEvent'
 
 export default function Dashboard() {
@@ -19,12 +19,9 @@ export default function Dashboard() {
   const { profile } = useSelector((state) => state.profile)
   const dashboardTrackedRef = useRef(false)
 
-  const [loading, setLoading] = useState(true)
-  const [todos, setTodos] = useState([])
-  
   // Hooks for extracted logic
-  const { analyticsData } = useAnalytics()
-  const { trialInfo } = useTrial()
+  const { analyticsData = { isLoading: true, kpiData: {}, activityTimelineData: [], userActivityData: [], projectStatusData: [], recentActivity: [], error: null } } = useAnalytics()
+  const { trialInfo = { isLoading: false, trialEnd: null, isExpired: false, daysLeft: 0 } } = useTrial()
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -40,8 +37,6 @@ export default function Dashboard() {
 
     dashboardTrackedRef.current = true
 
-    console.log('[Dashboard] Tracking dashboard_view:', profile.company_id)
-
     trackEvent({
       companyId: profile.company_id,
       type: 'dashboard_view',
@@ -49,29 +44,7 @@ export default function Dashboard() {
     })
   }, [profile?.company_id])
 
-  useEffect(() => {
-    // Simulate loading for todos
-    const timer = setTimeout(() => {
-      setLoading(false)
-      // Mock todos data
-      setTodos([
-        { id: 1, title: 'Review Q3 financial reports', completed: true, userId: 1 },
-        { id: 2, title: 'Update team on project status', completed: false, userId: 1 },
-        { id: 3, title: 'Prepare presentation slides', completed: false, userId: 2 },
-        { id: 4, title: 'Schedule client meeting', completed: true, userId: 2 },
-        { id: 5, title: 'Review code changes', completed: false, userId: 3 },
-        { id: 6, title: 'Update documentation', completed: true, userId: 3 },
-      ])
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  const isLoading = loading
-  const completedCount = todos?.filter(t => t.completed).length || 0
-  const totalCount = todos?.length || 0
-
-  if (loading) {
+  if (analyticsData.isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -103,31 +76,30 @@ export default function Dashboard() {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <RevenueChart 
-          data={analyticsData.revenueData} 
-          loading={analyticsData.isLoading} 
-          error={analyticsData.error} 
+        <ActivityTimelineChart
+          data={analyticsData.activityTimelineData}
+          loading={analyticsData.isLoading}
+          error={analyticsData.error}
         />
-        <ProjectStatusChart 
-          data={analyticsData.projectStatusData} 
-          loading={analyticsData.isLoading} 
-          error={analyticsData.error} 
+        <ProjectStatusChart
+          data={analyticsData.projectStatusData}
+          loading={analyticsData.isLoading}
+          error={analyticsData.error}
         />
       </div>
 
       {/* Users Chart */}
-      <UsersChart 
-        data={analyticsData.usersData} 
-        loading={analyticsData.isLoading} 
-        error={analyticsData.error} 
+      <UsersChart
+        data={analyticsData.userActivityData}
+        loading={analyticsData.isLoading}
+        error={analyticsData.error}
       />
 
-      {/* Tasks */}
-      <TasksList 
-        todos={todos} 
-        loading={loading} 
-        completedCount={completedCount}
-        totalCount={totalCount} 
+      {/* Recent Activity */}
+      <RecentActivityFeed
+        activities={analyticsData.recentActivity}
+        loading={analyticsData.isLoading}
+        error={analyticsData.error}
       />
     </div>
   )

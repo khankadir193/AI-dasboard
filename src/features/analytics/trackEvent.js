@@ -9,6 +9,7 @@ const ALLOWED_TYPES = [
   'projects',
   'projects_created',
   'projects_deleted',
+  'projects_updated',
   'conversion_rate',
   'orders',
   'traffic',
@@ -17,7 +18,7 @@ const ALLOWED_TYPES = [
 ]
 
 /**
- * Track an analytics event
+ * Track an analytics event (production-safe, non-blocking)
  * 
  * @param {Object} params - Event parameters
  * @param {string} params.companyId - The company ID (required for multi-tenant safety)
@@ -30,43 +31,31 @@ const ALLOWED_TYPES = [
 export async function trackEvent({ companyId, type, value = 1, metadata = {} }) {
   // Input validation
   if (!companyId || !type) {
-    console.warn('[Analytics] Missing tracking params', { companyId, type })
     return
   }
 
-  console.log('🔥 trackEvent CALLED:', { companyId, type, value })
+  // Type validation
+  if (!ALLOWED_TYPES.includes(type)) {
+    return
+  }
 
-  try {
-    const today = new Date().toISOString().split('T')[0]
-
-    const payload = {
+  // Non-blocking insert - fire and forget
+  supabase
+    .from('analytics_data')
+    .insert({
       company_id: companyId,
       metric_type: type,
       metric_value: value,
-      metric_date: today,
+      metric_date: new Date().toISOString().split('T')[0],
       metadata
-    }
-
-    console.log('📦 INSERT PAYLOAD:', payload)
-
-    const { data, error } = await supabase
-      .from('analytics_data')
-      .insert(payload)
-      .select()
-
-    console.log('📡 SUPABASE RESPONSE:', { data, error })
-
-    if (error) {
+    })
+    .then(({ error }) => {
       // Handle duplicate conflict silently (error code 23505)
-      if (error.code === '23505') {
-        console.warn('[Analytics] Duplicate prevented:', type)
-      } else {
-        console.error('[Analytics FAILED]', error)
+      if (error && error.code !== '23505') {
+        // Silently fail to avoid blocking UI
       }
-    } else {
-      console.log('[Analytics SUCCESS]', { type, companyId, value })
-    }
-  } catch (err) {
-    console.error('[Analytics UNEXPECTED ERROR]', err)
-  }
+    })
+    .catch(() => {
+      // Silently fail to avoid blocking UI
+    })
 }

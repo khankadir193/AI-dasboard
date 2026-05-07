@@ -8,36 +8,35 @@ export const useAnalytics = () => {
   const { profile } = useSelector((state) => state.profile)
   
   const [analyticsData, setAnalyticsData] = useState({
-    revenueData: [],
-    usersData: [],
+    activityTimelineData: [],
+    userActivityData: [],
     projectStatusData: [],
+    recentActivity: [],
     kpiData: {
-      totalRevenue: 0,
       activeUsers: 0,
-      conversionRate: 0,
-      newOrders: 0
+      projectsCreated: 0,
+      projectsDeleted: 0,
+      dashboardViews: 0,
+      projectsUpdated: 0
     },
     isLoading: true,
     error: null
   })
 
   const fetchAnalyticsData = async () => {
-    // DEBUG: Log current state
-    console.log("DASHBOARD -> PROFILE:", profile)
-    console.log("DASHBOARD -> COMPANY ID:", profile?.company_id)
-
     // GUARD 1: Do NOT fetch if user or company_id is not ready
     if (!user?.id || !profile?.company_id) {
-      console.log("DASHBOARD -> Guarding: user or company_id not ready")
       setAnalyticsData({
-        revenueData: [],
-        usersData: [],
+        activityTimelineData: [],
+        userActivityData: [],
         projectStatusData: [],
+        recentActivity: [],
         kpiData: {
-          totalRevenue: 0,
           activeUsers: 0,
-          conversionRate: 0,
-          newOrders: 0
+          projectsCreated: 0,
+          projectsDeleted: 0,
+          dashboardViews: 0,
+          projectsUpdated: 0
         },
         isLoading: false,
         error: null
@@ -63,37 +62,41 @@ export const useAnalytics = () => {
       analyticsApi.setCompanyId(profileData.company_id)
 
       // Fetch all analytics data in parallel
-      const [revenueData, usersData, projectStatusData, kpiData] = await Promise.all([
-        analyticsApi.fetchRevenueData(14).catch(() => []),
-        analyticsApi.fetchUsersData(14).catch(() => []),
+      const [activityTimelineData, userActivityData, projectStatusData, recentActivity, kpiData] = await Promise.all([
+        analyticsApi.fetchActivityTimelineData(14).catch(() => []),
+        analyticsApi.fetchActivityTimelineData(14).catch(() => []),
         analyticsApi.fetchProjectStatusData().catch(() => []),
+        analyticsApi.fetchRecentActivity(10).catch(() => []),
         analyticsApi.fetchKPIData().catch(() => ({
-          totalRevenue: 0,
           activeUsers: 0,
-          conversionRate: 0,
-          newOrders: 0
+          projectsCreated: 0,
+          projectsDeleted: 0,
+          dashboardViews: 0,
+          projectsUpdated: 0
         }))
       ])
 
       setAnalyticsData({
-        revenueData,
-        usersData,
+        activityTimelineData,
+        userActivityData,
         projectStatusData,
+        recentActivity,
         kpiData,
         isLoading: false,
         error: null
       })
     } catch (error) {
-      console.error('Error fetching analytics data:', error)
       setAnalyticsData({
-        revenueData: [],
-        usersData: [],
+        activityTimelineData: [],
+        userActivityData: [],
         projectStatusData: [],
+        recentActivity: [],
         kpiData: {
-          totalRevenue: 0,
           activeUsers: 0,
-          conversionRate: 0,
-          newOrders: 0
+          projectsCreated: 0,
+          projectsDeleted: 0,
+          dashboardViews: 0,
+          projectsUpdated: 0
         },
         isLoading: false,
         error: error.message
@@ -104,10 +107,8 @@ export const useAnalytics = () => {
   useEffect(() => {
     // Only fetch when profile's company_id is available
     if (!profile?.company_id) {
-      console.log("DASHBOARD -> useEffect: company_id not ready, skipping fetch")
       return
     }
-    console.log("DASHBOARD -> useEffect: company_id ready, fetching data")
     fetchAnalyticsData()
   }, [profile?.company_id])
 

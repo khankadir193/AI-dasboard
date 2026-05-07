@@ -5,17 +5,17 @@ import {
 import { Loader2 } from 'lucide-react'
 import { memo } from 'react'
 
-const UsersChart = memo(({ data = [], loading = false, error = null }) => {
+const ActivityTimelineChart = memo(({ data = [], loading = false, error = null }) => {
   const safeData = Array.isArray(data) ? data : []
 
   return (
-    <div className="card">
+    <div className="card xl:col-span-2">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="font-semibold text-gray-900 dark:text-white">User Activity Trend</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Real event activity over time</p>
+          <h2 className="font-semibold text-gray-900 dark:text-white">Activity Timeline</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Events tracked over time</p>
         </div>
-        <span className="text-xs bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400 font-medium px-2.5 py-1 rounded-full">
+        <span className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-medium px-2.5 py-1 rounded-full">
           Real Data
         </span>
       </div>
@@ -41,9 +41,9 @@ const UsersChart = memo(({ data = [], loading = false, error = null }) => {
             <Line
               type="monotone"
               dataKey="count"
-              stroke="#10b981"
+              stroke="#3b82f6"
               strokeWidth={2}
-              dot={{ fill: '#10b981', r: 4 }}
+              dot={{ fill: '#3b82f6', r: 4 }}
               activeDot={{ r: 6 }}
             />
           </LineChart>
@@ -53,5 +53,4 @@ const UsersChart = memo(({ data = [], loading = false, error = null }) => {
   )
 })
 
-export default UsersChart
-
+export default ActivityTimelineChart

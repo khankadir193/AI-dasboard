@@ -113,47 +113,117 @@ class AnalyticsApiService {
     }
 
     try {
+      // Fetch analytics data for last 30 days
       const endDate = new Date()
       const startDate = new Date()
-      startDate.setDate(startDate.getDate() - 30) // Last 30 days
+      startDate.setDate(startDate.getDate() - 30)
 
-      const { data, error } = await supabase
+      const { data: analyticsData, error: analyticsError } = await supabase
         .from('analytics_data')
         .select('*')
         .eq('company_id', this.currentCompanyId)
         .gte('metric_date', startDate.toISOString().split('T')[0])
         .lte('metric_date', endDate.toISOString().split('T')[0])
 
-      if (error) throw error
+      if (analyticsError) throw analyticsError
 
-      // Calculate KPIs
-      const kpis = {
-        totalRevenue: 0,
-        activeUsers: 0,
-        conversionRate: 0,
-        newOrders: 0
-      }
+      // Calculate real KPIs from tracked events
+      let activeUsers = 0
+      let projectsCreated = 0
+      let projectsDeleted = 0
+      let dashboardViews = 0
+      let projectsUpdated = 0
 
-      data?.forEach(item => {
+      analyticsData?.forEach(item => {
         switch (item.metric_type) {
-          case 'revenue':
-            kpis.totalRevenue += parseFloat(item.metric_value ?? 0)
+          case 'active_users':
+            activeUsers += parseInt(item.metric_value ?? 0)
             break
-          case 'users':
-            kpis.activeUsers = Math.max(kpis.activeUsers, parseInt(item.metric_value ?? 0))
+          case 'dashboard_view':
+            dashboardViews += parseInt(item.metric_value ?? 0)
             break
-          case 'conversion_rate':
-            kpis.conversionRate = parseFloat(item.metric_value ?? 0)
+          case 'projects_created':
+            projectsCreated += parseInt(item.metric_value ?? 0)
             break
-          case 'orders':
-            kpis.newOrders += parseInt(item.metric_value ?? 0)
+          case 'projects_updated':
+            projectsUpdated += parseInt(item.metric_value ?? 0)
+            break
+          case 'projects_deleted':
+            projectsDeleted += parseInt(item.metric_value ?? 0)
             break
         }
       })
 
-      return kpis
+      return {
+        activeUsers,
+        projectsCreated,
+        projectsDeleted,
+        dashboardViews,
+        projectsUpdated
+      }
     } catch (error) {
-      console.error('Error fetching KPI data:', error)
+      throw error
+    }
+  }
+
+  // Fetch activity timeline data for chart
+  async fetchActivityTimelineData(dateRange = 30) {
+    if (!this.currentCompanyId) {
+      throw new Error('Company ID not set. Please authenticate first.')
+    }
+
+    try {
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - dateRange)
+
+      const { data, error } = await supabase
+        .from('analytics_data')
+        .select('*')
+        .eq('company_id', this.currentCompanyId)
+        .gte('metric_date', startDate.toISOString().split('T')[0])
+        .order('metric_date', { ascending: true })
+
+      if (error) throw error
+
+      // Group events by date
+      const eventsByDate = data?.reduce((acc, item) => {
+        const date = new Date(item.metric_date).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        })
+        if (!acc[date]) {
+          acc[date] = { date, count: 0 }
+        }
+        acc[date].count += parseInt(item.metric_value ?? 1)
+        return acc
+      }, {}) || {}
+
+      return Object.values(eventsByDate)
+    } catch (error) {
+      console.error('Error fetching activity timeline data:', error)
+      throw error
+    }
+  }
+
+  // Fetch recent activity for activity feed
+  async fetchRecentActivity(limit = 10) {
+    if (!this.currentCompanyId) {
+      throw new Error('Company ID not set. Please authenticate first.')
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('analytics_data')
+        .select('*')
+        .eq('company_id', this.currentCompanyId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (error) throw error
+
+      return data || []
+    } catch (error) {
+      console.error('Error fetching recent activity:', error)
       throw error
     }
   }

@@ -35,23 +35,19 @@ export const createProject = createAsyncThunk(
   async (name, { rejectWithValue, getState }) => {
     try {
       const data = await createProjectApi(name)
-      
+
       // Track analytics after successful project creation
       const state = getState()
       const companyId = state.profile?.profile?.company_id
-      
-      console.log('[createProject] Attempting to track analytics, companyId:', companyId)
-      
+
       if (companyId) {
         trackEvent({
           companyId,
           type: 'projects_created',
           value: 1
         })
-      } else {
-        console.warn('[createProject] No company_id found in Redux state - skipping analytics')
       }
-      
+
       return data
     } catch (error) {
       return rejectWithValue(error.message)
@@ -67,23 +63,19 @@ export const deleteProject = createAsyncThunk(
   async (projectId, { rejectWithValue, getState }) => {
     try {
       const deletedProject = await deleteProjectApi(projectId)
-      
+
       // Track analytics after successful project deletion
       const state = getState()
       const companyId = state.profile?.profile?.company_id
-      
-      console.log('[deleteProject] Attempting to track analytics, companyId:', companyId)
-      
+
       if (companyId) {
         trackEvent({
           companyId,
           type: 'projects_deleted',
           value: 1
         })
-      } else {
-        console.warn('[deleteProject] No company_id found in Redux state - skipping analytics')
       }
-      
+
       return projectId
     } catch (error) {
       return rejectWithValue(error.message)
@@ -96,9 +88,22 @@ export const deleteProject = createAsyncThunk(
  */
 export const updateProject = createAsyncThunk(
   'projects/updateProject',
-  async ({ projectId, updates }, { rejectWithValue }) => {
+  async ({ projectId, updates }, { rejectWithValue, getState }) => {
     try {
       const data = await updateProjectApi(projectId, updates)
+
+      // Track analytics after successful project update
+      const state = getState()
+      const companyId = state.profile?.profile?.company_id
+
+      if (companyId) {
+        trackEvent({
+          companyId,
+          type: 'projects_updated',
+          value: 1
+        })
+      }
+
       return data
     } catch (error) {
       return rejectWithValue(error.message)
