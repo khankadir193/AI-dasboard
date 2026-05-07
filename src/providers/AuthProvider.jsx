@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { supabase } from '../lib/supabaseClient'
 import { setUser, setLoading, clearUser } from '../store/slices/authSlice'
 import { clearProfile, fetchUserProfile } from '../store/slices/profileSlice'
 import { clearTenant } from '../store/slices/tenantSlice'
 import { clearProjects } from '../store/slices/projectsSlice'
 import FullScreenLoader from '../components/common/FullScreenLoader'
+import { trackEvent } from '../features/analytics/trackEvent'
 
 /**
  * AuthProvider - Simplified authentication
@@ -17,6 +18,9 @@ export default function AuthProvider({ children }) {
   const dispatch = useDispatch()
   const [isInitialized, setIsInitialized] = useState(false)
   const timeoutRef = useRef(null)
+  const { user } = useSelector((state) => state.auth)
+  const { profile } = useSelector((state) => state.profile)
+  const loginTrackedRef = useRef(false)
 
   useEffect(() => {
     let isMounted = true
@@ -96,6 +100,7 @@ export default function AuthProvider({ children }) {
         // SIGNED_OUT - clear everything
         if (event === 'SIGNED_OUT') {
           console.log('[AuthProvider] Signed out - clearing all state')
+          loginTrackedRef.current = false
           dispatch(clearUser())
           dispatch(clearProfile())
           dispatch(clearTenant())
@@ -125,6 +130,30 @@ export default function AuthProvider({ children }) {
       subscription.unsubscribe()
     }
   }, [dispatch])
+
+  // Track login analytics when user and profile are available
+  useEffect(() => {
+    // company must exist
+    if (!profile?.company_id) {
+      return
+    }
+
+    // already tracked for this login session
+    if (loginTrackedRef.current) {
+      return
+    }
+
+    // lock immediately
+    loginTrackedRef.current = true
+
+    console.log('[AuthProvider] Tracking active_users:', profile.company_id)
+
+    trackEvent({
+      companyId: profile.company_id,
+      type: 'active_users',
+      value: 1
+    })
+  }, [profile?.company_id])
 
   if (!isInitialized) {
     return <FullScreenLoader />

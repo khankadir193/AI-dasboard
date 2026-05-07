@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS analytics_data (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
-    metric_type TEXT NOT NULL CHECK (metric_type IN ('revenue', 'users', 'projects', 'conversion_rate', 'orders', 'traffic', 'engagement')),
+    metric_type TEXT NOT NULL CHECK (metric_type IN ('revenue', 'expenses', 'users', 'active_users', 'projects', 'projects_created', 'projects_deleted', 'conversion_rate', 'orders', 'traffic', 'engagement', 'dashboard_view')),
     metric_value NUMERIC NOT NULL,
     metric_date DATE NOT NULL DEFAULT CURRENT_DATE,
     metadata JSONB DEFAULT '{}',
@@ -340,3 +340,28 @@ CREATE POLICY "Users can view their company" ON companies
       SELECT company_id FROM profiles WHERE id = auth.uid()
     )
   );
+
+-- =====================================================
+-- MIGRATION: Update analytics_data metric_type constraint
+-- =====================================================
+
+-- Drop existing constraint and recreate with new allowed types
+ALTER TABLE analytics_data DROP CONSTRAINT IF EXISTS analytics_data_metric_type_check;
+
+ALTER TABLE analytics_data ADD CONSTRAINT analytics_data_metric_type_check
+  CHECK (metric_type IN ('revenue', 'expenses', 'users', 'active_users', 'projects', 'projects_created', 'projects_deleted', 'conversion_rate', 'orders', 'traffic', 'engagement', 'dashboard_view'));
+
+-- =====================================================
+-- CLEANUP: Remove mock/sample data from analytics_data
+-- =====================================================
+
+-- Delete all mock/sample data
+DELETE FROM analytics_data
+WHERE metadata->>'source' IN ('mock', 'sample', 'demo')
+   OR metadata->>'isMock' = 'true';
+
+-- Optional: Delete suspicious data (very large values that may be random)
+-- Uncomment if needed after reviewing data
+-- DELETE FROM analytics_data
+-- WHERE metric_value > 10000
+-- AND metadata->>'isReal' IS NULL;

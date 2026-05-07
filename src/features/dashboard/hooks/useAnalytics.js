@@ -83,25 +83,6 @@ export const useAnalytics = () => {
         isLoading: false,
         error: null
       })
-
-      // Generate sample data if no data exists
-      if (revenueData.length === 0 && usersData.length === 0) {
-        try {
-          await analyticsApi.generateSampleData()
-          // Retry fetching after generating sample data
-          const [newRevenueData, newUsersData] = await Promise.all([
-            analyticsApi.fetchRevenueData(14),
-            analyticsApi.fetchUsersData(14)
-          ])
-          setAnalyticsData(prev => ({
-            ...prev,
-            revenueData: newRevenueData,
-            usersData: newUsersData
-          }))
-        } catch (sampleError) {
-          console.warn('Could not generate sample data:', sampleError)
-        }
-      }
     } catch (error) {
       console.error('Error fetching analytics data:', error)
       setAnalyticsData({

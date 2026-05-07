@@ -5,6 +5,7 @@ import {
   deleteProject as deleteProjectApi,
   updateProject as updateProjectApi
 } from '../../services/projectsService'
+import { trackEvent } from '../../features/analytics/trackEvent'
 
 // ============================
 // Async Thunks
@@ -31,9 +32,26 @@ export const fetchProjects = createAsyncThunk(
  */
 export const createProject = createAsyncThunk(
   'projects/createProject',
-  async (name, { rejectWithValue }) => {
+  async (name, { rejectWithValue, getState }) => {
     try {
       const data = await createProjectApi(name)
+      
+      // Track analytics after successful project creation
+      const state = getState()
+      const companyId = state.profile?.profile?.company_id
+      
+      console.log('[createProject] Attempting to track analytics, companyId:', companyId)
+      
+      if (companyId) {
+        trackEvent({
+          companyId,
+          type: 'projects_created',
+          value: 1
+        })
+      } else {
+        console.warn('[createProject] No company_id found in Redux state - skipping analytics')
+      }
+      
       return data
     } catch (error) {
       return rejectWithValue(error.message)
@@ -46,9 +64,26 @@ export const createProject = createAsyncThunk(
  */
 export const deleteProject = createAsyncThunk(
   'projects/deleteProject',
-  async (projectId, { rejectWithValue }) => {
+  async (projectId, { rejectWithValue, getState }) => {
     try {
-      await deleteProjectApi(projectId)
+      const deletedProject = await deleteProjectApi(projectId)
+      
+      // Track analytics after successful project deletion
+      const state = getState()
+      const companyId = state.profile?.profile?.company_id
+      
+      console.log('[deleteProject] Attempting to track analytics, companyId:', companyId)
+      
+      if (companyId) {
+        trackEvent({
+          companyId,
+          type: 'projects_deleted',
+          value: 1
+        })
+      } else {
+        console.warn('[deleteProject] No company_id found in Redux state - skipping analytics')
+      }
+      
       return projectId
     } catch (error) {
       return rejectWithValue(error.message)

@@ -1,6 +1,7 @@
 import { Calendar, Activity, Edit, Trash2 } from 'lucide-react'
 import EmptyState from '../../../components/common/EmptyState'
 import GuardedIconButton from '../../../components/common/GuardedIconButton'
+import { useSelector } from 'react-redux'
 
 /**
  * ProjectsTable - Displays projects in a table format
@@ -22,6 +23,14 @@ export default function ProjectsTable({
     return new Date(dateString).toLocaleDateString()
   }
 
+  const { user } = useSelector((state) => state.auth);
+  const displayName = user?.email?.split('@')[0] || 'User'; 
+
+  const getCreatorName = (project) => {
+    if(displayName) return displayName
+    return 'Unknown'
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
@@ -35,6 +44,9 @@ export default function ProjectsTable({
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Created By
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Created
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -45,7 +57,7 @@ export default function ProjectsTable({
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {projects.length === 0 ? (
               <tr>
-                <td colSpan="4" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan="5" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                   <EmptyState
                     icon={Activity}
                     title="No projects found"
@@ -71,6 +83,9 @@ export default function ProjectsTable({
                     >
                       {project.status}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {getCreatorName(project)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex items-center gap-2">

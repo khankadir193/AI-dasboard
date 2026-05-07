@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { Loader2 } from 'lucide-react'
@@ -11,12 +11,14 @@ import RevenueChart from './components/Charts/RevenueChart'
 import UsersChart from './components/Charts/UsersChart'
 import ProjectStatusChart from './components/Charts/ProjectStatusChart'
 import TasksList from './components/Tasks/TasksList'
+import { trackEvent } from '../analytics/trackEvent'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, loading: isAuthLoading } = useSelector((state) => state.auth)
   const { profile } = useSelector((state) => state.profile)
-  
+  const dashboardTrackedRef = useRef(false)
+
   const [loading, setLoading] = useState(true)
   const [todos, setTodos] = useState([])
   
@@ -29,6 +31,23 @@ export default function Dashboard() {
       navigate('/signin', { replace: true })
     }
   }, [isAuthLoading, user, navigate])
+
+  // Track dashboard view analytics once when profile is loaded
+  useEffect(() => {
+    if (!profile?.company_id) return
+
+    if (dashboardTrackedRef.current) return
+
+    dashboardTrackedRef.current = true
+
+    console.log('[Dashboard] Tracking dashboard_view:', profile.company_id)
+
+    trackEvent({
+      companyId: profile.company_id,
+      type: 'dashboard_view',
+      value: 1
+    })
+  }, [profile?.company_id])
 
   useEffect(() => {
     // Simulate loading for todos

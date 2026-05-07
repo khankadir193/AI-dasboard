@@ -2,63 +2,197 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
-import { generateUserData, generateRevenueData, formatCurrency } from '../../utils/mockData'
-
-const userData = generateUserData(12)
-const revenueData = generateRevenueData(30)
+import { formatCurrency } from '../../utils/mockData'
+import { useSelector } from 'react-redux'
+import { analyticsApi } from '../../lib/analyticsApi'
+import { useEffect, useState } from 'react'
 
 export default function Analytics() {
+  const { profile } = useSelector((state) => state.profile)
+  const [userData, setUserData] = useState([])
+  const [revenueData, setRevenueData] = useState([])
+  const [eventCounts, setEventCounts] = useState({
+    activeUsers: 0,
+    projectsCreated: 0,
+    projectsUpdated: 0,
+    projectsDeleted: 0,
+    dashboardViews: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (profile?.company_id) {
+      analyticsApi.setCompanyId(profile.company_id)
+      fetchRealAnalyticsData()
+    }
+  }, [profile])
+
+  const fetchRealAnalyticsData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Fetch real data from Supabase - query actual tracked event types
+      const [
+        activeUsers,
+        projectsCreated,
+        projectsUpdated,
+        projectsDeleted,
+        dashboardViews
+      ] = await Promise.all([
+        analyticsApi.fetchAnalyticsData('active_users', 30),
+        analyticsApi.fetchAnalyticsData('projects_created', 30),
+        analyticsApi.fetchAnalyticsData('projects_updated', 30),
+        analyticsApi.fetchAnalyticsData('projects_deleted', 30),
+        analyticsApi.fetchAnalyticsData('dashboard_view', 30)
+      ])
+
+      // Set event counts for display - use reduce to sum metric_values
+      setEventCounts({
+        activeUsers: activeUsers.reduce((sum, item) => sum + (item.metric_value || 1), 0),
+        projectsCreated: projectsCreated.reduce((sum, item) => sum + (item.metric_value || 1), 0),
+        projectsUpdated: projectsUpdated.reduce((sum, item) => sum + (item.metric_value || 1), 0),
+        projectsDeleted: projectsDeleted.reduce((sum, item) => sum + (item.metric_value || 1), 0),
+        dashboardViews: dashboardViews.reduce((sum, item) => sum + (item.metric_value || 1), 0)
+      })
+
+      // Transform data for charts
+      const allEvents = [
+        ...activeUsers.map(item => ({ ...item, label: 'Login' })),
+        ...projectsCreated.map(item => ({ ...item, label: 'Project Created' })),
+        ...projectsUpdated.map(item => ({ ...item, label: 'Project Updated' })),
+        ...projectsDeleted.map(item => ({ ...item, label: 'Project Deleted' })),
+        ...dashboardViews.map(item => ({ ...item, label: 'Dashboard View' }))
+      ]
+
+      // Group by date for chart
+      const eventsByDate = allEvents.reduce((acc, item) => {
+        const date = new Date(item.metric_date).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        })
+        if (!acc[date]) {
+          acc[date] = { date, count: 0, events: [] }
+        }
+        acc[date].count += item.metric_value || 1
+        acc[date].events.push(item.label)
+        return acc
+      }, {})
+
+      setUserData(Object.values(eventsByDate))
+      setRevenueData([]) // No revenue data in current tracking
+    } catch (err) {
+      console.error('[Analytics] Failed to fetch real data:', err)
+      setError('Failed to load analytics data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-500">Loading analytics...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-red-500">{error}</p>
+      </div>
+    )
+  }
+
+  if (userData.length === 0 && revenueData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-500">No analytics data yet. Start using the app to see analytics.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 stagger">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* User Growth Line Chart */}
         <div className="card">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">User Growth</h2>
-          <p className="text-sm text-gray-500 mb-6">Monthly active vs new users</p>
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={userData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={2} dot={false} name="Total Users" />
-              <Line type="monotone" dataKey="newUsers" stroke="#10b981" strokeWidth={2} dot={false} name="New Users" />
-            </LineChart>
-          </ResponsiveContainer>
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Activity Timeline</h2>
+          <p className="text-sm text-gray-500 mb-6">Events tracked over time</p>
+          {userData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={userData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} dot={false} name="Events" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-gray-500">No activity data available</p>
+            </div>
+          )}
         </div>
 
-        {/* Revenue vs Expenses Bar Chart */}
+        {/* Event Types Breakdown */}
         <div className="card">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Revenue vs Expenses</h2>
-          <p className="text-sm text-gray-500 mb-6">Last 14 days comparison</p>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={revenueData.slice(-14)} barSize={10} barCategoryGap="30%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis tickFormatter={v => `$${v / 1000}k`} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-              <Tooltip formatter={value => formatCurrency(value)} />
-              <Legend />
-              <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Revenue" />
-              <Bar dataKey="expenses" fill="#f87171" radius={[4, 4, 0, 0]} name="Expenses" />
-            </BarChart>
-          </ResponsiveContainer>
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Event Types</h2>
+          <p className="text-sm text-gray-500 mb-6">Distribution of tracked events</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Login (active_users)</span>
+              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{eventCounts.activeUsers}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects Created</span>
+              <span className="text-sm font-bold text-green-600 dark:text-green-400">{eventCounts.projectsCreated}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects Updated</span>
+              <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{eventCounts.projectsUpdated}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Projects Deleted</span>
+              <span className="text-sm font-bold text-red-600 dark:text-red-400">{eventCounts.projectsDeleted}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Dashboard Views</span>
+              <span className="text-sm font-bold text-purple-600 dark:text-purple-400">{eventCounts.dashboardViews}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Summary Stats */}
+      {/* Summary Stats - Will be calculated from real data */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: 'Avg. Revenue / Day', value: '$2,808', sub: 'Based on last 30 days' },
-          { label: 'Total Users (YTD)', value: '14,230', sub: '+2,100 this month' },
-          { label: 'Profit Margin', value: '62%', sub: '↑ 4% from last quarter' },
-        ].map(stat => (
-          <div key={stat.label} className="card text-center">
-            <p className="text-sm text-gray-500">{stat.label}</p>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stat.value}</p>
-            <p className="text-xs text-gray-400 mt-1">{stat.sub}</p>
-          </div>
-        ))}
+        <div className="card text-center">
+          <p className="text-sm text-gray-500">Total Events Tracked</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+            {
+              eventCounts.activeUsers +
+              eventCounts.projectsCreated +
+              eventCounts.projectsUpdated +
+              eventCounts.projectsDeleted +
+              eventCounts.dashboardViews
+            }
+          </p>
+          <p className="text-xs text-gray-400 mt-1">Real user activity</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-sm text-gray-500">Data Source</p>
+          <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">Real</p>
+          <p className="text-xs text-gray-400 mt-1">No mock data</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-sm text-gray-500">Status</p>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">Active</p>
+          <p className="text-xs text-gray-400 mt-1">Event-based tracking</p>
+        </div>
       </div>
     </div>
   )
