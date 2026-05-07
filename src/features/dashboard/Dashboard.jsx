@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { Loader2 } from 'lucide-react'
@@ -17,7 +17,8 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { user, loading: isAuthLoading } = useSelector((state) => state.auth)
   const { profile } = useSelector((state) => state.profile)
-  
+  const dashboardTrackedRef = useRef(false)
+
   const [loading, setLoading] = useState(true)
   const [todos, setTodos] = useState([])
   
@@ -33,19 +34,20 @@ export default function Dashboard() {
 
   // Track dashboard view analytics once when profile is loaded
   useEffect(() => {
-    if (profile?.company_id) {
-      console.log('[Dashboard] Tracking dashboard view, companyId:', profile.company_id)
-      trackEvent({
-        companyId: profile.company_id,
-        type: 'dashboard_view',
-        value: 1
-      }).catch(error => {
-        console.error('[Dashboard] Analytics tracking failed:', error.message)
-      })
-    }
-    // Empty dependency array ensures this runs only once per session
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!profile?.company_id) return
+
+    if (dashboardTrackedRef.current) return
+
+    dashboardTrackedRef.current = true
+
+    console.log('[Dashboard] Tracking dashboard_view:', profile.company_id)
+
+    trackEvent({
+      companyId: profile.company_id,
+      type: 'dashboard_view',
+      value: 1
+    })
+  }, [profile?.company_id])
 
   useEffect(() => {
     // Simulate loading for todos

@@ -40,12 +40,12 @@ export default function Analytics() {
         analyticsApi.fetchAnalyticsData('dashboard_view', 30)
       ])
 
-      // Set event counts for display
+      // Set event counts for display - use reduce to sum metric_values
       setEventCounts({
-        activeUsers: activeUsers.length,
-        projectsCreated: projectsCreated.length,
-        projectsDeleted: projectsDeleted.length,
-        dashboardViews: dashboardViews.length
+        activeUsers: activeUsers.reduce((sum, item) => sum + (item.metric_value || 1), 0),
+        projectsCreated: projectsCreated.reduce((sum, item) => sum + (item.metric_value || 1), 0),
+        projectsDeleted: projectsDeleted.reduce((sum, item) => sum + (item.metric_value || 1), 0),
+        dashboardViews: dashboardViews.reduce((sum, item) => sum + (item.metric_value || 1), 0)
       })
 
       // Transform data for charts
@@ -65,7 +65,7 @@ export default function Analytics() {
         if (!acc[date]) {
           acc[date] = { date, count: 0, events: [] }
         }
-        acc[date].count += 1
+        acc[date].count += item.metric_value || 1
         acc[date].events.push(item.label)
         return acc
       }, {})
@@ -158,7 +158,9 @@ export default function Analytics() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card text-center">
           <p className="text-sm text-gray-500">Total Events Tracked</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{userData.length + revenueData.length}</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+            {eventCounts.activeUsers + eventCounts.projectsCreated + eventCounts.projectsDeleted + eventCounts.dashboardViews}
+          </p>
           <p className="text-xs text-gray-400 mt-1">Real user activity</p>
         </div>
         <div className="card text-center">

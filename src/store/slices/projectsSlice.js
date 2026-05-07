@@ -43,7 +43,7 @@ export const createProject = createAsyncThunk(
       console.log('[createProject] Attempting to track analytics, companyId:', companyId)
       
       if (companyId) {
-        await trackEvent({
+        trackEvent({
           companyId,
           type: 'projects_created',
           value: 1
@@ -75,7 +75,7 @@ export const deleteProject = createAsyncThunk(
       console.log('[deleteProject] Attempting to track analytics, companyId:', companyId)
       
       if (companyId) {
-        await trackEvent({
+        trackEvent({
           companyId,
           type: 'projects_deleted',
           value: 1

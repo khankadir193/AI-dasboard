@@ -28,58 +28,45 @@ const ALLOWED_TYPES = [
  * @returns {Promise<void>}
  */
 export async function trackEvent({ companyId, type, value = 1, metadata = {} }) {
-  // Multi-tenant safety: skip if company_id is missing
-  if (!companyId) {
-    console.warn('[trackEvent] Missing companyId - skipping analytics insert')
+  // Input validation
+  if (!companyId || !type) {
+    console.warn('[Analytics] Missing tracking params', { companyId, type })
     return
   }
 
-  // Validate required fields
-  if (!type || typeof type !== 'string') {
-    console.error('[trackEvent] Invalid metric_type - skipping analytics insert')
-    return
-  }
-
-  // Validate metric_type against allowed list
-  if (!ALLOWED_TYPES.includes(type)) {
-    console.error('[trackEvent] Invalid metric_type:', type, '- allowed types:', ALLOWED_TYPES)
-    return
-  }
-
-  // Safety check: prevent fake/mock data insertion
-  if (metadata?.isMock === true || metadata?.source === 'mock' || metadata?.source === 'sample') {
-    console.warn('[trackEvent] Rejecting mock data insertion - metadata:', metadata)
-    return
-  }
-
-  // Safety check: detect suspicious random values
-  if (typeof value === 'number' && value > 10000 && !metadata?.isReal) {
-    console.warn('[trackEvent] Suspiciously large value detected - may be random data:', value)
-  }
-
-  console.log('[trackEvent] Tracking event:', { companyId, type, value })
+  console.log('🔥 trackEvent CALLED:', { companyId, type, value })
 
   try {
-    const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0]
 
-    const { error } = await supabase
-      .from('analytics_data')
-      .insert({
-        company_id: companyId,
-        metric_type: type,
-        metric_value: value,
-        metric_date: today,
-        metadata: metadata
-      })
-
-    if (error) {
-      console.error('[trackEvent] Analytics insert failed:', error.message)
-      return
+    const payload = {
+      company_id: companyId,
+      metric_type: type,
+      metric_value: value,
+      metric_date: today,
+      metadata
     }
 
-    console.log('[trackEvent] Analytics inserted successfully')
-  } catch (error) {
-    // Handle errors - do NOT break UI
-    console.error('[trackEvent] Unexpected error:', error.message)
+    console.log('📦 INSERT PAYLOAD:', payload)
+
+    const { data, error } = await supabase
+      .from('analytics_data')
+      .insert(payload)
+      .select()
+
+    console.log('📡 SUPABASE RESPONSE:', { data, error })
+
+    if (error) {
+      // Handle duplicate conflict silently (error code 23505)
+      if (error.code === '23505') {
+        console.warn('[Analytics] Duplicate prevented:', type)
+      } else {
+        console.error('[Analytics FAILED]', error)
+      }
+    } else {
+      console.log('[Analytics SUCCESS]', { type, companyId, value })
+    }
+  } catch (err) {
+    console.error('[Analytics UNEXPECTED ERROR]', err)
   }
 }
