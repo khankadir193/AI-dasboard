@@ -1,19 +1,10 @@
-# AIInsights UI Fix - Production Ready ✅
+- [ ] Update src/features/analytics/Analytics.jsx per production-safe analytics UI improvements
+  - [ ] Remove static "Data Source" summary card
+  - [ ] Add "Most Active Event" card using real eventCounts with safe fallback
+  - [ ] Fix timeline aggregation to group by DATE(created_at) and plot numeric event volume via metric_value||1
+  - [ ] Add "Latest Activity" card using latest created_at mapped from real event types
+  - [ ] Add/adjust empty states so UI never crashes on empty analytics
+  - [ ] Introduce useMemo for derived timeline, mostActiveEvent, latestActivity
+  - [ ] Ensure totals use reduce(sum + (metric_value||1)) only
+  - [ ] Sanity check chart dataKey matches derived timeline structure
 
-**Status:** Complete - All edge cases handled, Enter fixed, impressive design
-
-**Final Fixes Applied:**
-1. **Scroll Fix**: `useLayoutEffect + scrollTop = heightDiff - 20px` → No header overlap on Enter
-2. **Header z-40 backdrop-blur** → Always visible
-3. **Pure flex layout** → Zero vh conflicts
-4. **Responsive design** → Mobile-first breakpoints
-5. **Enhanced UX** → Gradient loading, polished buttons, typing indicators
-
-**Test Checklist:**
-- [x] Enter prompt → header stable 
-- [x] Mobile keyboard → no shake
-- [x] Long conversation → scroll contained
-- [x] Resize/rotate → responsive
-- [x] Dark mode → perfect
-
-Navigate `/ai-insights` → Fully impressive & stable! 🎉
