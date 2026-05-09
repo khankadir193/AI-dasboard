@@ -6,13 +6,12 @@ import { updateUserRole, toggleUserStatus } from '../../store/slices/usersSlice'
 
 const PAGE_SIZE = 5
 
-// Deterministic role colors (no random generation)
+// Deterministic role colors - matching schema: admin, manager, analyst, viewer
 const ROLE_COLORS = {
   'admin': 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100',
-  'editor': 'bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100',
-  'viewer': 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100',
   'manager': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100',
-  'analyst': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-800 dark:text-cyan-100'
+  'analyst': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-800 dark:text-cyan-100',
+  'viewer': 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
 }
 
 // Deterministic status colors (no random generation)
@@ -38,15 +37,9 @@ const formatUsers = (rawUsers) => {
   return rawUsers.map((user, index) => {
     // Safe email extraction with fallback
     const email = user?.email || ''
-    const emailPart = email?.split('@')?.[0] || 'user'
 
-    // Derive display name from email or name fields
-    const firstName = user?.first_name || ''
-    const lastName = user?.last_name || ''
-    const fullName = (firstName + ' ' + lastName).trim()
-    const displayName = fullName || emailPart
-      .replace(/[._-]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
+    // Use displayName from slice (derived from email), or fallback
+    const displayName = user?.displayName || email?.split('@')?.[0]?.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Unknown'
 
     // Safe initials generation
     const initials = displayName
@@ -107,7 +100,7 @@ function SortIcon({ field, sortField, sortDir }) {
 
 export default function DataTable() {
   const dispatch = useDispatch()
-  const { data: rawUsers, isLoading } = useUsers()
+  const { data: rawUsers, isLoading, error } = useUsers()
   const users = useMemo(() => formatUsers(rawUsers), [rawUsers])
 
   const [search, setSearch] = useState('')
@@ -329,7 +322,8 @@ export default function DataTable() {
           >
             <option value="All">Role: All</option>
             <option value="Admin">Admin</option>
-            <option value="Editor">Editor</option>
+            <option value="Manager">Manager</option>
+            <option value="Analyst">Analyst</option>
             <option value="Viewer">Viewer</option>
           </select>
           <ChevronDownIcon size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -383,6 +377,18 @@ export default function DataTable() {
                   <td colSpan={8} className="text-center py-16 text-gray-400">
                     <Loader2 size={24} className="animate-spin mx-auto mb-2" />
                     Loading data...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr className="h-[320px]">
+                  <td colSpan={8} className="h-full">
+                    <div className="flex flex-col items-center justify-center h-full py-16 px-4">
+                      <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                        <Users2 size={24} className="text-red-500" />
+                      </div>
+                      <p className="text-gray-900 dark:text-white font-medium mb-1">Error loading users</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{error?.message || 'Check console for details'}</p>
+                    </div>
                   </td>
                 </tr>
               ) : paginated.length === 0 ? (

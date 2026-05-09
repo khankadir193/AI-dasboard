@@ -17,7 +17,12 @@ export const fetchAllUsers = createAsyncThunk(
           )
         `)
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase profiles fetch error:', error)
+        throw error
+      }
+
+      console.log('Fetched profiles:', profiles?.length || 0, profiles)
 
       // Get current user email from auth session
       let currentUserEmail = ''
@@ -33,12 +38,17 @@ export const fetchAllUsers = createAsyncThunk(
       // Map to expected format with all profile data
       const users = (profiles || []).map((profile) => {
         // Derive display name from email (before @ symbol) since first/last name columns don't exist
-        const emailPrefix = profile.email?.split('@')[0] || 'user'
+        const email = profile.email || ''
+        const emailPrefix = email.split('@')[0] || 'user'
         const displayName = emailPrefix.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        
+        // Handle company data - could be array or object from Supabase join
+        const companyData = profile.companies
+        const company = Array.isArray(companyData) ? companyData[0] : companyData
         
         return {
           id: profile.id,
-          email: profile.email || '',
+          email: email,
           role: profile.role || 'viewer',
           is_active: profile.is_active !== false, // Default true
           created_at: profile.created_at,
@@ -47,9 +57,11 @@ export const fetchAllUsers = createAsyncThunk(
           avatar_url: profile.avatar_url,
           updated_at: profile.updated_at,
           displayName: displayName,
-          company: profile.companies || { name: null }
+          company: company || { name: null }
         }
       })
+
+      console.log('Mapped users:', users.length, users)
 
       return users
     } catch (error) {
