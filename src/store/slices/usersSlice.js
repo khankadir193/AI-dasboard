@@ -6,17 +6,11 @@ export const fetchAllUsers = createAsyncThunk(
   'users/fetchAllUsers',
   async (_, { rejectWithValue }) => {
     try {
-      // Fetch profiles with joined companies
-      // NOTE: Only use columns that exist in profiles table
-      // id, role, is_active, created_at, company_id are confirmed to exist
+      // Fetch all columns from profiles table with joined companies
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select(`
-          id,
-          role,
-          is_active,
-          created_at,
-          company_id,
+          *,
           companies:company_id (
             id,
             name
@@ -36,20 +30,23 @@ export const fetchAllUsers = createAsyncThunk(
         console.warn('Could not get auth user:', e)
       }
 
-      // Map to expected format with safe fallbacks
-      const users = (profiles || []).map((profile, index) => {
-        // Generate placeholder data since first_name/email are in auth.users only
-        const displayName = `User ${index + 1}`
-        const email = `user${index + 1}@company.com`
+      // Map to expected format with all profile data
+      const users = (profiles || []).map((profile) => {
+        // Derive display name from email (before @ symbol) since first/last name columns don't exist
+        const emailPrefix = profile.email?.split('@')[0] || 'user'
+        const displayName = emailPrefix.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
         
         return {
           id: profile.id,
-          email: email,
+          email: profile.email || '',
           role: profile.role || 'viewer',
           is_active: profile.is_active !== false, // Default true
           created_at: profile.created_at,
-          first_name: displayName,
-          last_name: '',
+          company_id: profile.company_id,
+          permissions: profile.permissions,
+          avatar_url: profile.avatar_url,
+          updated_at: profile.updated_at,
+          displayName: displayName,
           company: profile.companies || { name: null }
         }
       })
