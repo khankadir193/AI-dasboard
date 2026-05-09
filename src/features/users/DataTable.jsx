@@ -1,49 +1,99 @@
-import { useState, useMemo } from 'react'
-import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreVertical, Download, Plus, Calendar, Users2, ChevronDownIcon, X } from 'lucide-react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreVertical, Download, Plus, Calendar, Users2, ChevronDownIcon, X, Eye, Edit2, Ban, Trash2 } from 'lucide-react'
+import { useDispatch } from 'react-redux'
 import { useUsers } from '../../hooks/useFetch'
+import { updateUserRole, toggleUserStatus } from '../../store/slices/usersSlice'
 
 const PAGE_SIZE = 5
 
-// Generate consistent mock data for the enhanced fields
-const generateMockData = (users) => {
-  if (!users) return []
-  const roles = ['Admin', 'Editor', 'Viewer']
-  const roleColors = {
-    'Admin': 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100',
-    'Editor': 'bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100',
-    'Viewer': 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
-  }
-  const statusOptions = ['Active', 'Inactive']
-  const statusColors = {
-    'Active': 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100',
-    'Inactive': 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
-  }
-  const avatarColors = [
-    'from-blue-400 to-blue-600',
-    'from-indigo-400 to-indigo-600',
-    'from-teal-400 to-teal-600',
-    'from-amber-400 to-amber-600',
-    'from-rose-400 to-rose-600',
-    'from-violet-400 to-violet-600'
-  ]
+// Deterministic role colors (no random generation)
+const ROLE_COLORS = {
+  'admin': 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100',
+  'editor': 'bg-amber-100 text-amber-800 dark:bg-amber-800 dark:text-amber-100',
+  'viewer': 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100',
+  'manager': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100',
+  'analyst': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-800 dark:text-cyan-100'
+}
 
-  return users.map((user, index) => {
-    const roleIndex = (user.id * 7) % 3
-    const statusIndex = (user.id * 13) % 2
-    const daysAgo = (index % 30) + 1
-    const date = new Date()
-    date.setDate(date.getDate() - daysAgo)
+// Deterministic status colors (no random generation)
+const STATUS_COLORS = {
+  'Active': 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100',
+  'Inactive': 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+}
+
+// Deterministic avatar gradients based on ID
+const AVATAR_GRADIENTS = [
+  'from-blue-400 to-blue-600',
+  'from-indigo-400 to-indigo-600',
+  'from-teal-400 to-teal-600',
+  'from-amber-400 to-amber-600',
+  'from-rose-400 to-rose-600',
+  'from-violet-400 to-violet-600'
+]
+
+// Safe formatter for real Supabase data - no fake/mock data generation
+const formatUsers = (rawUsers) => {
+  if (!rawUsers || !Array.isArray(rawUsers)) return []
+
+  return rawUsers.map((user, index) => {
+    // Safe email extraction with fallback
+    const email = user?.email || ''
+    const emailPart = email?.split('@')?.[0] || 'user'
+
+    // Derive display name from email or name fields
+    const firstName = user?.first_name || ''
+    const lastName = user?.last_name || ''
+    const fullName = (firstName + ' ' + lastName).trim()
+    const displayName = fullName || emailPart
+      .replace(/[._-]/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase())
+
+    // Safe initials generation
+    const initials = displayName
+      ?.split(' ')
+      ?.map(n => n[0])
+      ?.join('')
+      ?.slice(0, 2)
+      ?.toUpperCase() || 'U'
+
+    // Normalize role (handle both 'admin' and 'Admin')
+    const rawRole = user?.role || 'viewer'
+    const normalizedRole = rawRole.charAt(0).toUpperCase() + rawRole.slice(1).toLowerCase()
+    const roleKey = rawRole.toLowerCase()
+
+    // Safe status determination - no random generation
+    const isActive = user?.is_active !== false // default true
+    const status = isActive ? 'Active' : 'Inactive'
+
+    // Safe date formatting
+    const joinedAt = user?.created_at
+      ? new Date(user.created_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        })
+      : 'N/A'
+
+    // Deterministic gradient based on index
+    const avatarGradient = AVATAR_GRADIENTS[index % AVATAR_GRADIENTS.length]
+
+    // Safe company name extraction
+    const companyName = user?.company?.name || 'No Company'
 
     return {
       ...user,
-      formattedId: `#USR-${1000 + user.id}`,
-      role: roles[roleIndex],
-      roleClass: roleColors[roles[roleIndex]],
-      status: statusOptions[statusIndex],
-      statusClass: statusColors[statusOptions[statusIndex]],
-      joinedAt: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      avatarGradient: avatarColors[index % avatarColors.length],
-      initials: user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+      formattedId: `#USR-${String(1001 + index).padStart(4, '0')}`,
+      displayName,
+      initials,
+      role: normalizedRole,
+      roleClass: ROLE_COLORS[roleKey] || ROLE_COLORS['viewer'],
+      status,
+      statusClass: STATUS_COLORS[status],
+      joinedAt,
+      avatarGradient,
+      companyName,
+      email,
+      isActive
     }
   })
 }
@@ -56,8 +106,9 @@ function SortIcon({ field, sortField, sortDir }) {
 }
 
 export default function DataTable() {
+  const dispatch = useDispatch()
   const { data: rawUsers, isLoading } = useUsers()
-  const users = useMemo(() => generateMockData(rawUsers), [rawUsers])
+  const users = useMemo(() => formatUsers(rawUsers), [rawUsers])
 
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState('formattedId')
@@ -66,6 +117,46 @@ export default function DataTable() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [roleFilter, setRoleFilter] = useState('All')
   const [dateRange, setDateRange] = useState('')
+  
+  // Action menu state
+  const [actionMenuOpen, setActionMenuOpen] = useState(null)
+  const actionMenuRef = useRef(null)
+  
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
+        setActionMenuOpen(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+  
+  // Action handlers
+  const handleViewUser = (user) => {
+    console.log('View user:', user)
+    alert(`View User: ${user.displayName}\nEmail: ${user.email}\nRole: ${user.role}\nStatus: ${user.status}`)
+    setActionMenuOpen(null)
+  }
+  
+  const handleEditRole = (user) => {
+    const newRole = user.role === 'Admin' ? 'Viewer' : 'Admin'
+    dispatch(updateUserRole({ userId: user.id, role: newRole.toLowerCase() }))
+    setActionMenuOpen(null)
+  }
+  
+  const handleToggleStatus = (user) => {
+    dispatch(toggleUserStatus({ userId: user.id, is_active: !user.isActive }))
+    setActionMenuOpen(null)
+  }
+  
+  const handleDeleteUser = (user) => {
+    if (confirm(`Are you sure you want to delete ${user.displayName}?`)) {
+      console.log('Delete user:', user.id)
+      setActionMenuOpen(null)
+    }
+  }
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -88,36 +179,68 @@ export default function DataTable() {
   }
 
   const filtered = useMemo(() => {
-    if (!users) return []
+    if (!users || !Array.isArray(users)) return []
     let data = [...users]
 
-    // Search
+    // Search with null safety
     if (search) {
       const q = search.toLowerCase()
-      data = data.filter(u =>
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        u.company.name.toLowerCase().includes(q)
-      )
+      data = data.filter(u => {
+        const displayName = (u?.displayName || '').toLowerCase()
+        const email = (u?.email || '').toLowerCase()
+        const companyName = (u?.companyName || '').toLowerCase()
+        return displayName.includes(q) || email.includes(q) || companyName.includes(q)
+      })
     }
 
     // Status filter
     if (statusFilter !== 'All') {
-      data = data.filter(u => u.status === statusFilter)
+      data = data.filter(u => u?.status === statusFilter)
     }
 
-    // Role filter
+    // Role filter (case insensitive)
     if (roleFilter !== 'All') {
-      data = data.filter(u => u.role === roleFilter)
+      data = data.filter(u => u?.role === roleFilter)
     }
 
-    // Sort
+    // Sort with null safety
     data.sort((a, b) => {
-      let aVal = a[sortField]
-      let bVal = b[sortField]
-      if (sortField === 'formattedId') { aVal = a.id; bVal = b.id }
-      if (sortField === 'user') { aVal = a.name.toLowerCase(); bVal = b.name.toLowerCase() }
-      if (sortField === 'company') { aVal = a.company.name.toLowerCase(); bVal = b.company.name.toLowerCase() }
+      let aVal, bVal
+
+      switch (sortField) {
+        case 'formattedId':
+          aVal = a?.id || 0
+          bVal = b?.id || 0
+          break
+        case 'user':
+          aVal = (a?.displayName || '').toLowerCase()
+          bVal = (b?.displayName || '').toLowerCase()
+          break
+        case 'email':
+          aVal = (a?.email || '').toLowerCase()
+          bVal = (b?.email || '').toLowerCase()
+          break
+        case 'company':
+          aVal = (a?.companyName || '').toLowerCase()
+          bVal = (b?.companyName || '').toLowerCase()
+          break
+        case 'role':
+          aVal = (a?.role || '').toLowerCase()
+          bVal = (b?.role || '').toLowerCase()
+          break
+        case 'status':
+          aVal = (a?.status || '').toLowerCase()
+          bVal = (b?.status || '').toLowerCase()
+          break
+        case 'joinedAt':
+          aVal = a?.created_at || ''
+          bVal = b?.created_at || ''
+          break
+        default:
+          aVal = a?.[sortField] || ''
+          bVal = b?.[sortField] || ''
+      }
+
       if (typeof aVal === 'string') aVal = aVal.toLowerCase()
       if (typeof bVal === 'string') bVal = bVal.toLowerCase()
       if (aVal < bVal) return sortDir === 'asc' ? -1 : 1
@@ -129,16 +252,23 @@ export default function DataTable() {
   }, [users, search, statusFilter, roleFilter, sortField, sortDir])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // Pagination edge case: reset to page 1 if current page exceeds total pages
+  const safePage = Math.min(page, Math.max(1, totalPages))
+  if (safePage !== page && totalPages > 0) {
+    setPage(safePage)
+  }
+
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const columns = [
     { key: 'formattedId', label: 'ID', sortable: true },
-    { key: 'user', label: 'User', sortable: true },
-    { key: 'email', label: 'Email', sortable: true },
-    { key: 'company', label: 'Company', sortable: true },
-    { key: 'role', label: 'Role', sortable: true },
-    { key: 'status', label: 'Status', sortable: true },
-    { key: 'joinedAt', label: 'Joined At', sortable: true },
+    { key: 'user', label: 'User', sortable: true, sortKey: 'user' },
+    { key: 'email', label: 'Email', sortable: true, sortKey: 'email' },
+    { key: 'company', label: 'Company', sortable: true, sortKey: 'company' },
+    { key: 'role', label: 'Role', sortable: true, sortKey: 'role' },
+    { key: 'status', label: 'Status', sortable: true, sortKey: 'status' },
+    { key: 'joinedAt', label: 'Joined At', sortable: true, sortKey: 'joinedAt' },
     { key: 'actions', label: 'Actions', sortable: false }
   ]
 
@@ -225,14 +355,14 @@ export default function DataTable() {
 
       {/* Table Card */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
                 {columns.map(col => (
                   <th
                     key={col.key}
-                    onClick={() => col.sortable && handleSort(col.key === 'user' ? 'name' : col.key === 'formattedId' ? 'id' : col.key)}
+                    onClick={() => col.sortable && handleSort(col.sortKey || col.key)}
                     className={`px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap ${
                       col.sortable ? 'cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300' : ''
                     }`}
@@ -240,7 +370,7 @@ export default function DataTable() {
                     <span className="flex items-center gap-1">
                       {col.label}
                       {col.sortable && (
-                        <SortIcon field={col.key === 'user' ? 'name' : col.key === 'formattedId' ? 'id' : col.key} sortField={sortField} sortDir={sortDir} />
+                        <SortIcon field={col.sortKey || col.key} sortField={sortField} sortDir={sortDir} />
                       )}
                     </span>
                   </th>
@@ -249,16 +379,16 @@ export default function DataTable() {
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {isLoading ? (
-                <tr>
+                <tr className="h-[320px]">
                   <td colSpan={8} className="text-center py-16 text-gray-400">
                     <Loader2 size={24} className="animate-spin mx-auto mb-2" />
                     Loading data...
                   </td>
                 </tr>
               ) : paginated.length === 0 ? (
-                <tr>
-                  <td colSpan={8}>
-                    <div className="flex flex-col items-center justify-center py-16 px-4">
+                <tr className="h-[320px]">
+                  <td colSpan={8} className="h-full">
+                    <div className="flex flex-col items-center justify-center h-full py-16 px-4">
                       <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
                         <Users2 size={24} className="text-gray-400" />
                       </div>
@@ -276,57 +406,95 @@ export default function DataTable() {
               ) : (
                 paginated.map(user => (
                   <tr
-                    key={user.id}
+                    key={user?.id || Math.random()}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     {/* ID */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">{user.formattedId}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">{user?.formattedId || 'N/A'}</td>
 
                     {/* User with Avatar */}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${user.avatarGradient} flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}>
-                          {user.initials}
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${user?.avatarGradient || 'from-gray-400 to-gray-600'} flex items-center justify-center text-white text-sm font-semibold flex-shrink-0`}>
+                          {user?.initials || 'U'}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{user.username}</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">{user?.displayName || 'Unknown'}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email?.split('@')[0] || ''}</p>
                         </div>
                       </div>
                     </td>
 
                     {/* Email */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{user.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{user?.email || 'N/A'}</td>
 
                     {/* Company */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                        {user.company.name}
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                        {user?.companyName || 'No Company'}
                       </span>
                     </td>
 
                     {/* Role */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${user.roleClass}`}>
-                        {user.role}
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${user?.roleClass || ROLE_COLORS['viewer']}`}>
+                        {user?.role || 'Viewer'}
                       </span>
                     </td>
 
                     {/* Status */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${user.statusClass}`}>
-                        {user.status}
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${user?.statusClass || STATUS_COLORS['Active']}`}>
+                        {user?.status || 'Active'}
                       </span>
                     </td>
 
                     {/* Joined At */}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.joinedAt}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user?.joinedAt || 'N/A'}</td>
 
                     {/* Actions */}
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-right relative" ref={actionMenuOpen === user?.id ? actionMenuRef : null}>
+                      <button 
+                        onClick={() => setActionMenuOpen(actionMenuOpen === user?.id ? null : user?.id)}
+                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
                         <MoreVertical size={18} />
                       </button>
+                      
+                      {/* Action Menu Dropdown */}
+                      {actionMenuOpen === user?.id && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                          <button
+                            onClick={() => handleViewUser(user)}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                          >
+                            <Eye size={14} />
+                            View User
+                          </button>
+                          <button
+                            onClick={() => handleEditRole(user)}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                          >
+                            <Edit2 size={14} />
+                            Edit Role
+                          </button>
+                          <button
+                            onClick={() => handleToggleStatus(user)}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                          >
+                            <Ban size={14} />
+                            {user.isActive ? 'Suspend User' : 'Activate User'}
+                          </button>
+                          <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                          >
+                            <Trash2 size={14} />
+                            Delete User
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -339,12 +507,12 @@ export default function DataTable() {
         {!isLoading && filtered.length > 0 && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} users
+              Showing {(safePage - 1) * PAGE_SIZE + 1} to {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} users
             </span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
+                disabled={safePage === 1}
                 className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={18} />
@@ -363,13 +531,13 @@ export default function DataTable() {
                   // Always show first page
                   pages.push(1)
 
-                  if (page > 3) {
+                  if (safePage > 3) {
                     pages.push('...')
                   }
 
                   // Show pages around current
-                  const start = Math.max(2, page - 1)
-                  const end = Math.min(totalPages - 1, page + 1)
+                  const start = Math.max(2, safePage - 1)
+                  const end = Math.min(totalPages - 1, safePage + 1)
 
                   for (let i = start; i <= end; i++) {
                     if (!pages.includes(i)) {
@@ -377,7 +545,7 @@ export default function DataTable() {
                     }
                   }
 
-                  if (page < totalPages - 2) {
+                  if (safePage < totalPages - 2) {
                     if (!pages.includes('...')) pages.push('...')
                   }
 
@@ -395,7 +563,7 @@ export default function DataTable() {
                       key={p}
                       onClick={() => setPage(p)}
                       className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                        p === page
+                        p === safePage
                           ? 'bg-blue-600 text-white'
                           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                       }`}
@@ -408,7 +576,7 @@ export default function DataTable() {
 
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                disabled={safePage === totalPages || totalPages === 0}
                 className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight size={18} />

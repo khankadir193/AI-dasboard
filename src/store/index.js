@@ -3,6 +3,7 @@ import authSlice from './slices/authSlice'
 import profileSlice from './slices/profileSlice'
 import tenantSlice from './slices/tenantSlice'
 import projectsSlice from './slices/projectsSlice'
+import usersSlice from './slices/usersSlice'
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     profile: profileSlice,
     tenant: tenantSlice,
     projects: projectsSlice,
+    users: usersSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
