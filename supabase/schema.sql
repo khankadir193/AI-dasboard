@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('admin', 'manager', 'analyst', 'viewer')),
+    email TEXT,
     permissions JSONB DEFAULT '[]',
     first_name TEXT,
     last_name TEXT,
@@ -315,8 +316,8 @@ BEGIN
   RETURNING id INTO company_uuid;
   
   -- Create profile linked to company
-  INSERT INTO profiles (id, company_id, role)
-  VALUES (NEW.id, company_uuid, 'admin');
+  INSERT INTO profiles (id, company_id, role, email)
+  VALUES (NEW.id, company_uuid, 'admin', NEW.email);
   
   RETURN NEW;
 END;
