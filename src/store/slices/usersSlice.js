@@ -6,7 +6,33 @@ export const fetchAllUsers = createAsyncThunk(
   'users/fetchAllUsers',
   async (_, { rejectWithValue }) => {
     try {
-      // Fetch all columns from profiles table with joined companies
+      // Determine tenant scope from currently logged-in user profile (company_id)
+      const {
+        data: { user: authUser },
+        error: authUserError
+      } = await supabase.auth.getUser()
+
+      if (authUserError) {
+        console.error('Supabase auth.getUser error:', authUserError)
+      }
+
+      const authUid = authUser?.id
+      if (!authUid) {
+        return []
+      }
+
+      const { data: myProfile, error: myProfileError } = await supabase
+        .from('profiles')
+        .select('id, company_id')
+        .eq('id', authUid)
+        .maybeSingle()
+
+      if (myProfileError) throw myProfileError
+      if (!myProfile?.company_id) return []
+
+      const tenantCompanyId = myProfile.company_id
+
+      // Fetch profiles for ONLY the logged-in user's company, and join the company name
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select(`
@@ -16,52 +42,48 @@ export const fetchAllUsers = createAsyncThunk(
             name
           )
         `)
+        .eq('company_id', tenantCompanyId)
 
       if (error) {
         console.error('Supabase profiles fetch error:', error)
         throw error
       }
 
-      console.log('Fetched profiles:', profiles?.length || 0, profiles)
-
-      // Get current user email from auth session
-      let currentUserEmail = ''
-      let currentUserName = ''
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        currentUserEmail = user?.email || ''
-        currentUserName = user?.user_metadata?.name || ''
-      } catch (e) {
-        console.warn('Could not get auth user:', e)
-      }
-
-      // Map to expected format with all profile data
       const users = (profiles || []).map((profile) => {
-        // Derive display name from email (before @ symbol) since first/last name columns don't exist
-        const email = profile.email || ''
+        const email = profile?.email || ''
+
+        // Prefer first_name/last_name when present; fallback to email prefix
+        const first = (profile?.first_name || '').trim()
+        const last = (profile?.last_name || '').trim()
+        const fullName = [first, last].filter(Boolean).join(' ').trim();
+
         const emailPrefix = email.split('@')[0] || 'user'
-        const displayName = emailPrefix.replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-        
-        // Handle company data - could be array or object from Supabase join
-        const companyData = profile.companies
-        const company = Array.isArray(companyData) ? companyData[0] : companyData
-        
+        const fallbackName = emailPrefix
+          .replace(/[._-]/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+
+          console.log('fallbackName..',fallbackName);
+        const displayName = fullName || fallbackName || 'Unknown'
+
+        // Handle company data shape - Supabase join may return object or array depending on relation
+        const companyData = profile?.companies
+        const companyObj = Array.isArray(companyData) ? companyData[0] : companyData
+        const companyName = companyObj?.name ?? null
+
         return {
           id: profile.id,
-          email: email,
+          email,
           role: profile.role || 'viewer',
-          is_active: profile.is_active !== false, // Default true
+          is_active: profile.is_active !== false,
           created_at: profile.created_at,
           company_id: profile.company_id,
           permissions: profile.permissions,
           avatar_url: profile.avatar_url,
           updated_at: profile.updated_at,
-          displayName: displayName,
-          company: company || { name: null }
+          displayName,
+          company: { name: companyName }
         }
       })
-
-      console.log('Mapped users:', users.length, users)
 
       return users
     } catch (error) {

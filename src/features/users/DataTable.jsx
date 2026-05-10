@@ -412,7 +412,7 @@ export default function DataTable() {
               ) : (
                 paginated.map(user => (
                   <tr
-                    key={user?.id || Math.random()}
+                    key={user?.id ?? user?.formattedId ?? index}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     {/* ID */}

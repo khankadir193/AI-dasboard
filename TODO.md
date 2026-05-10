@@ -1,10 +1,12 @@
-- [ ] Update src/features/analytics/Analytics.jsx per production-safe analytics UI improvements
-  - [ ] Remove static "Data Source" summary card
-  - [ ] Add "Most Active Event" card using real eventCounts with safe fallback
-  - [ ] Fix timeline aggregation to group by DATE(created_at) and plot numeric event volume via metric_value||1
-  - [ ] Add "Latest Activity" card using latest created_at mapped from real event types
-  - [ ] Add/adjust empty states so UI never crashes on empty analytics
-  - [ ] Introduce useMemo for derived timeline, mostActiveEvent, latestActivity
-  - [ ] Ensure totals use reduce(sum + (metric_value||1)) only
-  - [ ] Sanity check chart dataKey matches derived timeline structure
+# TODO - Users table rendering fix
+
+- [x] Fix `fetchAllUsers` in `src/store/slices/usersSlice.js` to:
+  - [x] get logged-in user's `company_id` from `profiles` using `auth.uid()`
+  - [x] fetch `profiles` scoped to that `company_id`
+  - [x] join `companies` to get `company.name`
+  - [x] map join result robustly (object/array/null)
+  - [x] improve `displayName` using `first_name/last_name` fallback to email
+- [x] Fix unstable row keys in `src/features/users/DataTable.jsx` (remove `Math.random()`)
+- [ ] Sanity test by running app / checking console for Supabase join/mapping errors
+
 
