@@ -1,8 +1,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreVertical, Download, Plus, Calendar, Users2, ChevronDownIcon, X, Eye, Edit2, Ban, Trash2 } from 'lucide-react'
-import { useDispatch } from 'react-redux'
+import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, MoreVertical, Download, Plus, Calendar, Users2, ChevronDownIcon, X, Eye, Edit2, Ban, Trash2, FileSpreadsheet, FileText } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
 import { useUsers } from '../../hooks/useFetch'
 import { updateUserRole, toggleUserStatus } from '../../store/slices/usersSlice'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 const PAGE_SIZE = 5
 
@@ -102,6 +105,8 @@ export default function DataTable() {
   const dispatch = useDispatch()
   const { data: rawUsers, isLoading, error } = useUsers()
   const users = useMemo(() => formatUsers(rawUsers), [rawUsers])
+  const profile = useSelector(state => state.profile.profile)
+  const isAdmin = profile?.role === 'admin'
 
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState('formattedId')
@@ -109,7 +114,10 @@ export default function DataTable() {
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('All')
   const [roleFilter, setRoleFilter] = useState('All')
-  const [dateRange, setDateRange] = useState('')
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [showExportDropdown, setShowExportDropdown] = useState(false)
+  const exportDropdownRef = useRef(null)
   
   // Action menu state
   const [actionMenuOpen, setActionMenuOpen] = useState(null)
@@ -120,6 +128,28 @@ export default function DataTable() {
     const handleClickOutside = (event) => {
       if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
         setActionMenuOpen(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Close date picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showDatePicker && !event.target.closest('[data-date-picker]')) {
+        setShowDatePicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showDatePicker])
+
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
+        setShowExportDropdown(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -151,6 +181,75 @@ export default function DataTable() {
     }
   }
 
+  const handleExportCSV = () => {
+    if (filtered.length === 0) return
+    
+    const exportData = filtered.map(user => ({
+      ID: user?.formattedId || 'N/A',
+      User: user?.displayName || 'Unknown',
+      Email: user?.email || '',
+      Company: user?.companyName || 'No Company',
+      Role: user?.role || 'Viewer',
+      Status: user?.status || 'Active',
+      'Joined At': user?.joinedAt || 'N/A'
+    }))
+
+    const headers = Object.keys(exportData[0] || {}).join(',')
+    const rows = exportData.map(row => Object.values(row).map(val => `"${val}"`).join(',')).join('\n')
+    const csv = headers + '\n' + rows
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'users-export.csv'
+    link.click()
+    setShowExportDropdown(false)
+  }
+
+  const handleExportExcel = () => {
+    if (filtered.length === 0) return
+    
+    const exportData = filtered.map(user => ({
+      ID: user?.formattedId || 'N/A',
+      User: user?.displayName || 'Unknown',
+      Email: user?.email || '',
+      Company: user?.companyName || 'No Company',
+      Role: user?.role || 'Viewer',
+      Status: user?.status || 'Active',
+      'Joined At': user?.joinedAt || 'N/A'
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Users')
+    XLSX.writeFile(workbook, 'users-export.xlsx')
+    setShowExportDropdown(false)
+  }
+
+  const handleExportPDF = () => {
+    if (filtered.length === 0) return
+    
+    const exportData = filtered.map(user => [
+      user?.formattedId || 'N/A',
+      user?.displayName || 'Unknown',
+      user?.email || '',
+      user?.companyName || 'No Company',
+      user?.role || 'Viewer',
+      user?.status || 'Active',
+      user?.joinedAt || 'N/A'
+    ])
+
+    const doc = new jsPDF()
+    autoTable(doc, {
+      head: [['ID', 'User', 'Email', 'Company', 'Role', 'Status', 'Joined At']],
+      body: exportData,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [37, 99, 235] }
+    })
+    doc.save('users-export.pdf')
+    setShowExportDropdown(false)
+  }
+
   const handleSort = (field) => {
     if (sortField === field) {
       setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
@@ -161,13 +260,13 @@ export default function DataTable() {
     setPage(1)
   }
 
-  const hasActiveFilters = search || statusFilter !== 'All' || roleFilter !== 'All' || dateRange
+  const hasActiveFilters = search || statusFilter !== 'All' || roleFilter !== 'All' || dateRange.start || dateRange.end
 
   const clearAllFilters = () => {
     setSearch('')
     setStatusFilter('All')
     setRoleFilter('All')
-    setDateRange('')
+    setDateRange({ start: '', end: '' })
     setPage(1)
   }
 
@@ -194,6 +293,20 @@ export default function DataTable() {
     // Role filter (case insensitive)
     if (roleFilter !== 'All') {
       data = data.filter(u => u?.role === roleFilter)
+    }
+
+    // Date range filter
+    if (dateRange.start || dateRange.end) {
+      data = data.filter(u => {
+        if (!u?.created_at) return false
+        const userDate = new Date(u.created_at)
+        const startDate = dateRange.start ? new Date(dateRange.start) : null
+        const endDate = dateRange.end ? new Date(dateRange.end) : null
+        
+        if (startDate && userDate < startDate) return false
+        if (endDate && userDate > endDate) return false
+        return true
+      })
     }
 
     // Sort with null safety
@@ -242,7 +355,7 @@ export default function DataTable() {
     })
 
     return data
-  }, [users, search, statusFilter, roleFilter, sortField, sortDir])
+  }, [users, search, statusFilter, roleFilter, dateRange, sortField, sortDir])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
 
@@ -274,10 +387,47 @@ export default function DataTable() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage and view all registered users in your workspace.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-            <Download size={16} />
-            Export
-          </button>
+          <div className="relative" ref={exportDropdownRef}>
+            <button 
+              onClick={() => isAdmin && filtered.length > 0 && setShowExportDropdown(!showExportDropdown)}
+              disabled={!isAdmin || filtered.length === 0}
+              className={`inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm font-medium transition-colors ${
+                !isAdmin || filtered.length === 0
+                  ? 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-50'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+              title={!isAdmin ? 'Only admins can export data' : filtered.length === 0 ? 'No data to export' : ''}
+            >
+              <Download size={16} />
+              Export
+            </button>
+            
+            {showExportDropdown && isAdmin && filtered.length > 0 && (
+              <div className="absolute right-0 top-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <FileText size={14} />
+                  CSV
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <FileSpreadsheet size={14} />
+                  Excel
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <FileText size={14} />
+                  PDF
+                </button>
+              </div>
+            )}
+          </div>
           <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
             <Plus size={16} />
             Add User
@@ -330,10 +480,58 @@ export default function DataTable() {
         </div>
 
         {/* Date Range */}
-        <button className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-          <Calendar size={16} className="text-gray-400" />
-          Date Range
-        </button>
+        <div className="relative" data-date-picker>
+          <button 
+            onClick={() => setShowDatePicker(!showDatePicker)}
+            className={`inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm transition-colors ${
+              dateRange.start || dateRange.end 
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+                : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          >
+            <Calendar size={16} className={dateRange.start || dateRange.end ? 'text-blue-500' : 'text-gray-400'} />
+            {dateRange.start || dateRange.end ? 'Date Filtered' : 'Date Range'}
+          </button>
+          
+          {showDatePicker && (
+            <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-50 min-w-[280px]" data-date-picker>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From</label>
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To</label>
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => { setDateRange({ start: '', end: '' }); setPage(1) }}
+                    className="flex-1 px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={() => { setShowDatePicker(false); setPage(1) }}
+                    className="flex-1 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Clear Filters */}
         {hasActiveFilters && (
