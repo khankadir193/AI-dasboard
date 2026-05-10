@@ -1,20 +1,20 @@
-import { Loader2 } from 'lucide-react'
+import { Loader2, LogIn, LayoutDashboard, PlusCircle, RefreshCw, Trash2, Activity } from 'lucide-react'
 import { memo } from 'react'
 
 const getEventIcon = (metricType) => {
   switch (metricType) {
     case 'projects_created':
-      return '🟢'
+      return { icon: PlusCircle, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' }
     case 'projects_updated':
-      return '🟡'
+      return { icon: RefreshCw, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30' }
     case 'projects_deleted':
-      return '🔴'
+      return { icon: Trash2, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' }
     case 'active_users':
-      return '🔵'
+      return { icon: LogIn, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' }
     case 'dashboard_view':
-      return '🟣'
+      return { icon: LayoutDashboard, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/30' }
     default:
-      return '⚪'
+      return { icon: Activity, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-800' }
   }
 }
 
@@ -81,23 +81,33 @@ const RecentActivityFeed = memo(({ activities = [], loading = false, error = nul
           <p>Error loading activity data</p>
         </div>
       ) : safeActivities.length === 0 ? (
-        <div className="flex items-center justify-center h-48 text-gray-500">
-          <p className="text-center">No analytics activity yet.<br />Create projects or use the dashboard to start tracking events.</p>
+        <div className="flex flex-col items-center justify-center h-48 text-gray-500">
+          <Activity size={32} className="mb-2 text-gray-400" />
+          <p className="text-center text-sm">No recent activity yet</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {safeActivities.slice(0, 10).map((activity, index) => (
-            <div
-              key={`${activity.id}-${index}`}
-              className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              <span className="text-xl flex-shrink-0">{getEventIcon(activity.metric_type)}</span>
-              <span className="text-sm flex-1 text-gray-700 dark:text-gray-300">
-                {getEventLabel(activity.metric_type)}
-              </span>
-              <span className="text-xs text-gray-400">{getTimeAgo(activity.created_at)}</span>
-            </div>
-          ))}
+        <div className="max-h-[420px] overflow-y-auto space-y-1">
+          {safeActivities.slice(0, 10).map((activity, index) => {
+            const { icon: Icon, color, bg } = getEventIcon(activity.metric_type)
+            return (
+              <div
+                key={`${activity.id}-${index}`}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-150"
+              >
+                <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center flex-shrink-0`}>
+                  <Icon size={16} className={color} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {getEventLabel(activity.metric_type)}
+                  </p>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                  {getTimeAgo(activity.created_at)}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

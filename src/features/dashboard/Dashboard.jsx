@@ -8,7 +8,7 @@ import { useAnalytics } from './hooks/useAnalytics'
 import { useTrial } from './hooks/useTrial'
 import KPISection from './components/KPI/KPISection'
 import ActivityTimelineChart from './components/Charts/ActivityTimelineChart'
-import UsersChart from './components/Charts/UsersChart'
+import EventDistributionChart from './components/Charts/EventDistributionChart'
 import ProjectStatusChart from './components/Charts/ProjectStatusChart'
 import RecentActivityFeed from './components/ActivityFeed/RecentActivityFeed'
 import { trackEvent } from '../analytics/trackEvent'
@@ -88,9 +88,9 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Users Chart */}
-      <UsersChart
-        data={analyticsData.userActivityData}
+      {/* Event Distribution Chart */}
+      <EventDistributionChart
+        kpiData={analyticsData.kpiData}
         loading={analyticsData.isLoading}
         error={analyticsData.error}
       />
