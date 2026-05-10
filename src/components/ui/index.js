@@ -6,3 +6,4 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 export { default as Badge } from './Badge'
 export { default as Spinner } from './Spinner'
 export { default as KPICard } from './KPICard'
+export { default as ToggleSwitch } from './ToggleSwitch'
