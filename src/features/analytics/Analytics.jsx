@@ -5,6 +5,24 @@ import {
 import { useSelector } from 'react-redux'
 import { analyticsApi } from '../../lib/analyticsApi'
 import { useEffect, useMemo, useState } from 'react'
+import { BarChart3, TrendingUp, Clock, Activity } from 'lucide-react'
+
+// Reusable event label mapping
+const EVENT_LABELS = {
+  active_users: 'User Login',
+  dashboard_view: 'Dashboard View',
+  projects_created: 'Project Created',
+  projects_updated: 'Project Updated',
+  projects_deleted: 'Project Deleted'
+}
+
+const EVENT_COLORS = {
+  active_users: { bg: 'bg-blue-50 dark:bg-blue-900/30', bar: 'bg-blue-500', text: 'text-blue-600 dark:text-blue-400' },
+  dashboard_view: { bg: 'bg-purple-50 dark:bg-purple-900/30', bar: 'bg-purple-500', text: 'text-purple-600 dark:text-purple-400' },
+  projects_created: { bg: 'bg-green-50 dark:bg-green-900/30', bar: 'bg-green-500', text: 'text-green-600 dark:text-green-400' },
+  projects_updated: { bg: 'bg-orange-50 dark:bg-orange-900/30', bar: 'bg-orange-500', text: 'text-orange-600 dark:text-orange-400' },
+  projects_deleted: { bg: 'bg-red-50 dark:bg-red-900/30', bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' }
+}
 
 export default function Analytics() {
   const { profile } = useSelector((state) => state.profile)
@@ -88,11 +106,11 @@ export default function Analytics() {
   const allEvents = useMemo(() => {
     const safe = (arr) => (Array.isArray(arr) ? arr : [])
     return [
-      ...safe(activeUsers).map((item) => ({ ...item, label: 'Login', metric_key: 'active_users' })),
-      ...safe(projectsCreated).map((item) => ({ ...item, label: 'Project Created', metric_key: 'projects_created' })),
-      ...safe(projectsUpdated).map((item) => ({ ...item, label: 'Project Updated', metric_key: 'projects_updated' })),
-      ...safe(projectsDeleted).map((item) => ({ ...item, label: 'Project Deleted', metric_key: 'projects_deleted' })),
-      ...safe(dashboardViews).map((item) => ({ ...item, label: 'Dashboard Viewed', metric_key: 'dashboard_view' }))
+      ...safe(activeUsers).map((item) => ({ ...item, label: EVENT_LABELS.active_users, metric_key: 'active_users' })),
+      ...safe(projectsCreated).map((item) => ({ ...item, label: EVENT_LABELS.projects_created, metric_key: 'projects_created' })),
+      ...safe(projectsUpdated).map((item) => ({ ...item, label: EVENT_LABELS.projects_updated, metric_key: 'projects_updated' })),
+      ...safe(projectsDeleted).map((item) => ({ ...item, label: EVENT_LABELS.projects_deleted, metric_key: 'projects_deleted' })),
+      ...safe(dashboardViews).map((item) => ({ ...item, label: EVENT_LABELS.dashboard_view, metric_key: 'dashboard_view' })),
     ]
   }, [activeUsers, projectsCreated, projectsUpdated, projectsDeleted, dashboardViews])
 
@@ -118,11 +136,11 @@ export default function Analytics() {
 
   const mostActiveEvent = useMemo(() => {
     const entries = [
-      { key: 'activeUsers', title: 'Login', count: eventCounts.activeUsers },
-      { key: 'projectsCreated', title: 'Project Created', count: eventCounts.projectsCreated },
-      { key: 'projectsUpdated', title: 'Project Updated', count: eventCounts.projectsUpdated },
-      { key: 'projectsDeleted', title: 'Project Deleted', count: eventCounts.projectsDeleted },
-      { key: 'dashboardViews', title: 'Dashboard Views', count: eventCounts.dashboardViews }
+      { key: 'active_users', title: EVENT_LABELS.active_users, count: eventCounts.activeUsers },
+      { key: 'projects_created', title: EVENT_LABELS.projects_created, count: eventCounts.projectsCreated },
+      { key: 'projects_updated', title: EVENT_LABELS.projects_updated, count: eventCounts.projectsUpdated },
+      { key: 'projects_deleted', title: EVENT_LABELS.projects_deleted, count: eventCounts.projectsDeleted },
+      { key: 'dashboard_view', title: EVENT_LABELS.dashboard_view, count: eventCounts.dashboardViews }
     ]
 
     if (!entries.length) return { title: null, count: 0, subtitle: null }
@@ -158,6 +176,7 @@ export default function Analytics() {
     if (!dt || Number.isNaN(dt.getTime())) return null
 
     const label = latest?.label || 'Activity'
+    const metricKey = latest.metric_key || 'active_users'
     const now = Date.now()
     const diffMs = Math.max(0, now - dt.getTime())
     const mins = Math.floor(diffMs / 60000)
@@ -170,20 +189,28 @@ export default function Analytics() {
     else if (mins > 0) timeAgo = `${mins} mins ago`
     else timeAgo = 'just now'
 
-    const icon = latest.metric_key === 'active_users'
-      ? '🟣'
-      : latest.metric_key === 'projects_created'
-        ? '🟢'
-        : latest.metric_key === 'projects_updated'
-          ? '🟡'
-          : latest.metric_key === 'projects_deleted'
-            ? '🔴'
-            : '🟣'
+    const color = EVENT_COLORS[metricKey]?.bar || 'bg-gray-500'
 
     return {
-      text: `${icon} ${label}`,
-      timeAgo
+      label,
+      timeAgo,
+      color
     }
+  }, [allEvents])
+
+  // Calculate unique days tracked for average daily events
+  const uniqueDaysTracked = useMemo(() => {
+    const dates = new Set()
+    allEvents.forEach(event => {
+      const createdAt = event?.created_at || event?.metric_date
+      if (createdAt) {
+        const dt = new Date(createdAt)
+        if (!Number.isNaN(dt.getTime())) {
+          dates.add(dt.toDateString())
+        }
+      }
+    })
+    return dates.size
   }, [allEvents])
 
   const totalEventsTracked = useMemo(() => {
@@ -195,6 +222,11 @@ export default function Analytics() {
       (eventCounts.dashboardViews || 0)
     )
   }, [eventCounts])
+
+  const averageDailyEvents = useMemo(() => {
+    if (uniqueDaysTracked === 0) return 0
+    return Math.round(totalEventsTracked / uniqueDaysTracked)
+  }, [totalEventsTracked, uniqueDaysTracked])
 
 
   if (loading) {
@@ -247,41 +279,70 @@ export default function Analytics() {
         <div className="card p-5">
           <h2 className="font-semibold text-base text-gray-900 dark:text-white mb-0.5">Event Types</h2>
           <p className="text-xs text-gray-500 mb-4">Distribution of tracked events</p>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Login (active_users)</span>
-              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{eventCounts.activeUsers}</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-md">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Projects Created</span>
-              <span className="text-xs font-bold text-green-600 dark:text-green-400">{eventCounts.projectsCreated}</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Projects Updated</span>
-              <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400">{eventCounts.projectsUpdated}</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-md">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Projects Deleted</span>
-              <span className="text-xs font-bold text-red-600 dark:text-red-400">{eventCounts.projectsDeleted}</span>
-            </div>
-            <div className="flex items-center justify-between px-3 py-2 bg-purple-50 dark:bg-purple-900/20 rounded-md">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Dashboard Views</span>
-              <span className="text-xs font-bold text-purple-600 dark:text-purple-400">{eventCounts.dashboardViews}</span>
-            </div>
+          <div className="space-y-3">
+            {[
+              { key: 'active_users', count: eventCounts.activeUsers },
+              { key: 'dashboard_view', count: eventCounts.dashboardViews },
+              { key: 'projects_updated', count: eventCounts.projectsUpdated },
+              { key: 'projects_created', count: eventCounts.projectsCreated },
+              { key: 'projects_deleted', count: eventCounts.projectsDeleted }
+            ]
+              .filter(item => item.count > 0)
+              .sort((a, b) => b.count - a.count)
+              .map(({ key, count }) => {
+                const colors = EVENT_COLORS[key] || EVENT_COLORS.active_users
+                const maxCount = Math.max(
+                  eventCounts.activeUsers,
+                  eventCounts.dashboardViews,
+                  eventCounts.projectsUpdated,
+                  eventCounts.projectsCreated,
+                  eventCounts.projectsDeleted
+                )
+                const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0
+                return (
+                  <div key={key}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{EVENT_LABELS[key]}</span>
+                      <span className={`text-xs font-bold ${colors.text}`}>{count}</span>
+                    </div>
+                    <div className={`h-2 rounded-full ${colors.bg}`}>
+                      <div 
+                        className={`h-2 rounded-full ${colors.bar} transition-all duration-300`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })
+            }
           </div>
         </div>
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card text-center py-4 px-4">
-          <p className="text-xs text-gray-500">Total Events Tracked</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card text-center py-4 px-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-150">
+          <div className="flex items-center justify-center mb-2">
+            <BarChart3 size={20} className="text-blue-600 dark:text-blue-400" />
+          </div>
+          <p className="text-xs text-gray-500">Total Events</p>
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{totalEventsTracked}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5">Real user activity</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">All time</p>
         </div>
 
-        {/* Most Active Event (replaces static Data Source card) */}
-        <div className="card text-center py-4 px-4">
+        <div className="card text-center py-4 px-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-150">
+          <div className="flex items-center justify-center mb-2">
+            <TrendingUp size={20} className="text-green-600 dark:text-green-400" />
+          </div>
+          <p className="text-xs text-gray-500">Avg Daily Events</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{averageDailyEvents}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">Per day</p>
+        </div>
+
+        <div className="card text-center py-4 px-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-150">
+          <div className="flex items-center justify-center mb-2">
+            <Activity size={20} className="text-purple-600 dark:text-purple-400" />
+          </div>
           <p className="text-xs text-gray-500">Most Active Event</p>
           {mostActiveEvent?.title ? (
             <>
@@ -292,23 +353,28 @@ export default function Analytics() {
           ) : (
             <>
               <p className="text-base font-bold text-gray-900 dark:text-white mt-1">No Activity Yet</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Start using the app to generate events</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Start using the app</p>
             </>
           )}
         </div>
 
-        {/* Latest Activity (small operational insight) */}
-        <div className="card text-center py-4 px-4">
+        <div className="card text-center py-4 px-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-150">
+          <div className="flex items-center justify-center mb-2">
+            <Clock size={20} className="text-orange-600 dark:text-orange-400" />
+          </div>
           <p className="text-xs text-gray-500">Latest Activity</p>
           {latestActivity ? (
             <>
-              <p className="text-base font-bold text-gray-900 dark:text-white mt-1 truncate">{latestActivity.text}</p>
+              <div className="flex items-center justify-center gap-2 mt-1">
+                <div className={`w-3 h-3 rounded-full ${latestActivity.color}`} />
+                <p className="text-base font-bold text-gray-900 dark:text-white truncate">{latestActivity.label}</p>
+              </div>
               <p className="text-xs text-gray-400 mt-0.5">{latestActivity.timeAgo}</p>
             </>
           ) : (
             <>
               <p className="text-base font-bold text-gray-900 dark:text-white mt-1">No recent activity</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Events will appear here automatically</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Events appear here</p>
             </>
           )}
         </div>

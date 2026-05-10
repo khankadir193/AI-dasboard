@@ -1,6 +1,15 @@
 import { Loader2, LogIn, LayoutDashboard, PlusCircle, RefreshCw, Trash2, Activity } from 'lucide-react'
 import { memo } from 'react'
 
+// Reusable event label mapping (consistent with Analytics page)
+const EVENT_LABELS = {
+  active_users: 'User Login',
+  dashboard_view: 'Dashboard View',
+  projects_created: 'Project Created',
+  projects_updated: 'Project Updated',
+  projects_deleted: 'Project Deleted'
+}
+
 const getEventIcon = (metricType) => {
   switch (metricType) {
     case 'projects_created':
@@ -19,20 +28,7 @@ const getEventIcon = (metricType) => {
 }
 
 const getEventLabel = (metricType) => {
-  switch (metricType) {
-    case 'projects_created':
-      return 'Project Created'
-    case 'projects_updated':
-      return 'Project Updated'
-    case 'projects_deleted':
-      return 'Project Deleted'
-    case 'active_users':
-      return 'User Login'
-    case 'dashboard_view':
-      return 'Dashboard Viewed'
-    default:
-      return 'Unknown Event'
-  }
+  return EVENT_LABELS[metricType] || 'Unknown Event'
 }
 
 const getTimeAgo = (dateString) => {
