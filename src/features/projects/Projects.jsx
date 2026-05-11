@@ -13,13 +13,16 @@ import {
   setSearchQuery,
   clearProjectsError,
   clearProjects,
+  setPage,
   selectProjects,
   selectProjectsLoading,
+  selectChangingPage,
   selectProjectsError,
   selectProjectsFilters,
   selectIsCreating,
   selectDeletingId,
-  selectIsUpdating
+  selectIsUpdating,
+  selectPagination
 } from '../../store/slices/projectsSlice'
 
 // Components
@@ -39,11 +42,13 @@ export default function Projects() {
   // Redux state
   const projects = useSelector(selectProjects)
   const loading = useSelector(selectProjectsLoading)
+  const changingPage = useSelector(selectChangingPage)
   const error = useSelector(selectProjectsError)
   const filters = useSelector(selectProjectsFilters)
   const creating = useSelector(selectIsCreating)
   const deletingId = useSelector(selectDeletingId)
   const updating = useSelector(selectIsUpdating)
+  const pagination = useSelector(selectPagination)
 
   // Local UI state
   const [showAddModal, setShowAddModal] = useState(false)
@@ -78,7 +83,7 @@ export default function Projects() {
   }, [dispatch, authLoading, companyId])
 
   // ============================
-  // Refetch when filters change (debounced 300ms)
+  // Refetch when filters or pagination change (debounced 300ms)
   // ============================
   useEffect(() => {
     if (!authLoading && !profileLoading && companyId) {
@@ -87,7 +92,7 @@ export default function Projects() {
       }, 300)
       return () => clearTimeout(timer)
     }
-  }, [dispatch, authLoading, companyId, filters.status, filters.search])
+  }, [dispatch, authLoading, companyId, filters.status, filters.search, pagination.page, pagination.limit])
 
   // ============================
   // Modal focus management
@@ -230,6 +235,10 @@ export default function Projects() {
     }
   }
 
+  const handlePageChange = (newPage) => {
+    dispatch(setPage(newPage))
+  }
+
   const handleRefresh = () => {
     dispatch(fetchProjects(filters))
   }
@@ -312,10 +321,10 @@ export default function Projects() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-200 dark:border-gray-700">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Projects</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage your company projects</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Manage your company projects</p>
         </div>
         <PermissionButton
           onClick={() => setShowAddModal(true)}
@@ -353,6 +362,9 @@ export default function Projects() {
         canDelete={canDelete}
         updateTooltip={updateTooltip}
         deleteTooltip={deleteTooltip}
+        pagination={pagination}
+        onPageChange={handlePageChange}
+        changingPage={changingPage}
       />
 
       {/* Modals */}

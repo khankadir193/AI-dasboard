@@ -17,9 +17,10 @@ import { trackEvent } from '../../features/analytics/trackEvent'
  */
 export const fetchProjects = createAsyncThunk(
   'projects/fetchProjects',
-  async (filters = {}, { rejectWithValue }) => {
+  async (filters = {}, { rejectWithValue, getState }) => {
     try {
-      const data = await fetchProjectsApi(filters)
+      const { page, limit } = getState().projects.pagination
+      const data = await fetchProjectsApi({ ...filters, page, limit })
       return data
     } catch (error) {
       return rejectWithValue(error.message)
@@ -120,6 +121,7 @@ const projectsSlice = createSlice({
   initialState: {
     items: [],
     loading: false,
+    changingPage: false,
     creating: false,
     deletingId: null,
     updating: false,
@@ -127,14 +129,21 @@ const projectsSlice = createSlice({
     filters: {
       status: '', // 'active' | 'inactive' | ''
       search: ''
+    },
+    pagination: {
+      page: 1,
+      limit: 5,
+      totalCount: 0
     }
   },
   reducers: {
     setStatusFilter: (state, action) => {
       state.filters.status = action.payload
+      state.pagination.page = 1
     },
     setSearchQuery: (state, action) => {
       state.filters.search = action.payload
+      state.pagination.page = 1
     },
     clearProjectsError: (state) => {
       state.error = null
@@ -142,6 +151,16 @@ const projectsSlice = createSlice({
     clearProjects: (state) => {
       state.items = []
       state.error = null
+      state.pagination.page = 1
+      state.pagination.totalCount = 0
+    },
+    setPage: (state, action) => {
+      state.pagination.page = action.payload
+      state.changingPage = true
+    },
+    setLimit: (state, action) => {
+      state.pagination.limit = action.payload
+      state.pagination.page = 1 // Reset to page 1 when limit changes
     }
   },
   extraReducers: (builder) => {
@@ -153,11 +172,14 @@ const projectsSlice = createSlice({
       })
       .addCase(fetchProjects.fulfilled, (state, action) => {
         state.loading = false
-        state.items = action.payload
+        state.changingPage = false
+        state.items = action.payload.items || action.payload
+        state.pagination.totalCount = action.payload.totalCount || action.payload.length || 0
         state.error = null
       })
       .addCase(fetchProjects.rejected, (state, action) => {
         state.loading = false
+        state.changingPage = false
         state.error = action.payload
       })
 
@@ -169,6 +191,8 @@ const projectsSlice = createSlice({
       .addCase(createProject.fulfilled, (state, action) => {
         state.creating = false
         state.items.unshift(action.payload) // Add to top
+        state.pagination.totalCount = (state.pagination.totalCount || 0) + 1
+        state.pagination.page = 1 // Reset to first page after creation
         state.error = null
       })
       .addCase(createProject.rejected, (state, action) => {
@@ -184,6 +208,14 @@ const projectsSlice = createSlice({
       .addCase(deleteProject.fulfilled, (state, action) => {
         state.deletingId = null
         state.items = state.items.filter(p => p.id !== action.payload)
+        state.pagination.totalCount = Math.max(0, (state.pagination.totalCount || 0) - 1)
+        
+        // If last item on page is deleted and not on first page, go to previous page
+        const totalPages = Math.ceil(state.pagination.totalCount / state.pagination.limit)
+        if (state.pagination.page > totalPages && state.pagination.page > 1) {
+          state.pagination.page = totalPages
+        }
+        
         state.error = null
       })
       .addCase(deleteProject.rejected, (state, action) => {
@@ -217,11 +249,13 @@ const projectsSlice = createSlice({
 
 export const selectProjects = (state) => state.projects.items
 export const selectProjectsLoading = (state) => state.projects.loading
+export const selectChangingPage = (state) => state.projects.changingPage
 export const selectProjectsError = (state) => state.projects.error
 export const selectProjectsFilters = (state) => state.projects.filters
 export const selectIsCreating = (state) => state.projects.creating
 export const selectDeletingId = (state) => state.projects.deletingId
 export const selectIsUpdating = (state) => state.projects.updating
+export const selectPagination = (state) => state.projects.pagination
 
 /**
  * Client-side filtered projects (fallback if not using server-side filtering)
@@ -246,7 +280,9 @@ export const {
   setStatusFilter,
   setSearchQuery,
   clearProjectsError,
-  clearProjects
+  clearProjects,
+  setPage,
+  setLimit
 } = projectsSlice.actions
 
 export default projectsSlice.reducer

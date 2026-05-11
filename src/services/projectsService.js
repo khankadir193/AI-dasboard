@@ -49,6 +49,7 @@ export const getUserProfile = async (userId) => {
 /**
  * Fetch projects for the current user's company
  * Automatically derives company_id from the user's profile
+ * Supports pagination with page and limit parameters
  */
 export const fetchProjects = async (filters = {}) => {
   // 1. Get current user
@@ -58,14 +59,21 @@ export const fetchProjects = async (filters = {}) => {
   const profile = await getUserProfile(user.id)
   const companyId = profile.company_id
 
-  // 3. Build query with tenant isolation
+  // 3. Extract pagination parameters with defaults
+  const page = filters.page || 1
+  const limit = filters.limit || 5
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+
+  // 4. Build query with tenant isolation and count
   let query = supabase
   .from('projects')
-  .select('*')
+  .select('*', { count: 'exact' })
   .eq('company_id', companyId)
   .order('created_at', { ascending: false })
+  .range(from, to)
 
-  // 4. Apply optional filters
+  // 5. Apply optional filters
   if (filters.status && ['active', 'inactive'].includes(filters.status)) {
     query = query.eq('status', filters.status)
   }
@@ -74,16 +82,19 @@ export const fetchProjects = async (filters = {}) => {
     query = query.ilike('name', `%${filters.search.trim()}%`)
   }
 
-  const { data, error } = await query
+  const { data, error, count } = await query
 
   if (error) {
     if (error.code === 'PGRST116') {
-      return [] // No projects found
+      return { items: [], totalCount: 0 } // No projects found
     }
     throw new Error(`Failed to fetch projects: ${error.message}`)
   }
 
-  return data || []
+  return {
+    items: data || [],
+    totalCount: count || 0
+  }
 }
 
 /**
