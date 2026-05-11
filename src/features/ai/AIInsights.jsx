@@ -1,13 +1,33 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
+import { Sparkles, Send, Loader2, Copy, Check, RefreshCw, TrendingUp, Users, Target, Package } from 'lucide-react';
 import { getAIInsight } from '../../lib/apiClient';
 import './AIInsights.css';
 
-const SAMPLE_PROMPTS = [
-  'Analyze my revenue trend: Q1=$42k, Q2=$38k, Q3=$51k, Q4=$67k. What are the key takeaways?',
-  'My user churn rate is 8% this month, up from 5% last month. What could be causing this?',
-  'Compare these two campaigns: Campaign A had 5000 clicks, 2% conversion, $2 CPC. Campaign B had 8000 clicks, 1.2% conversion, $1.5 CPC.',
-  'My top 3 products by revenue: Product A $32k, Product B $18k, Product C $9k. How should I prioritize my roadmap?',
+const ANALYSIS_TYPES = [
+  { 
+    text: 'Analyze my revenue trend: Q1=$42k, Q2=$38k, Q3=$51k, Q4=$67k. What are the key takeaways?', 
+    icon: TrendingUp, 
+    title: 'Revenue Analysis', 
+    description: 'Analyze business revenue trends and growth patterns'
+  },
+  { 
+    text: 'My user churn rate is 8% this month, up from 5% last month. What could be causing this?', 
+    icon: Users, 
+    title: 'User Behavior', 
+    description: 'Understand user activity and churn trends'
+  },
+  { 
+    text: 'Compare these two campaigns: Campaign A had 5000 clicks, 2% conversion, $2 CPC. Campaign B had 8000 clicks, 1.2% conversion, $1.5 CPC.', 
+    icon: Target, 
+    title: 'Campaign Comparison', 
+    description: 'Compare marketing campaigns and conversion metrics'
+  },
+  { 
+    text: 'My top 3 products by revenue: Product A $32k, Product B $18k, Product C $9k. How should I prioritize my roadmap?', 
+    icon: Package, 
+    title: 'Product Performance', 
+    description: 'Identify top-performing products and opportunities'
+  },
 ];
 
 function InsightMessage({ role, content }) {
@@ -122,74 +142,92 @@ export default function AIInsights() {
   };
 
   return (
-    <div className="ai-container">
-      {/* Header */}
-      <div className="ai-header-section bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-purple-50/50 dark:from-slate-950/50 dark:to-purple-950/30 shadow-sm mx-2 sm:mx-0">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 flex-wrap">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg">
-              <Sparkles size={16} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white leading-tight">AI Data Analyst</h1>
-              <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 mt-0.5 max-w-md">Secure backend proxy + Groq AI 🔒</p>
-            </div>
+    <div className="h-full flex flex-col">
+      {/* Header Bar */}
+      <div className="shrink-0 flex items-center justify-between px-2 sm:px-0 py-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <Sparkles size={16} className="text-white" />
           </div>
-          {messages.length > 0 && (
-            <button 
-              onClick={handleReset}
-              className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg text-[10px] sm:text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all flex items-center gap-1.5 shadow-sm border border-gray-200 dark:border-gray-700 whitespace-nowrap ml-auto sm:ml-0"
-            >
-              <RefreshCw size={12} className="shrink-0" />
-              <span>Reset</span>
-            </button>
-          )}
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">AI Insights</h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Analyze your business data with AI</p>
+          </div>
         </div>
+        {messages.length > 0 && (
+          <button 
+            onClick={handleReset}
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all flex items-center gap-1.5 border border-gray-200 dark:border-gray-700"
+          >
+            <RefreshCw size={12} className="shrink-0" />
+            <span className="hidden sm:inline">New Chat</span>
+          </button>
+        )}
       </div>
 
-      {/* Conversation */}
-      {messages.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
-          <p className="text-sm font-medium text-gray-500 mb-3">Try a sample prompt:</p>
-          <div className="space-y-2">
-            {SAMPLE_PROMPTS.map((prompt, i) => (
-              <button
-                key={i}
-                onClick={() => handleSend(prompt)}
-                className="w-full text-left text-sm px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all text-gray-600 dark:text-gray-400"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="ai-messages max-w-4xl mx-auto px-4 sm:px-0">
-          {messages.map((msg, i) => (
-            <InsightMessage key={i} role={msg.role} content={msg.content} />
-          ))}
-          {loading && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                <Loader2 size={14} className="text-white animate-spin" />
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl rounded-tl-sm p-4 flex items-center gap-2 text-sm text-gray-500">
-                <span className="inline-flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
-                </span>
-                Analyzing your data...
+      {/* Scrollable Middle Area */}
+      <div className="flex-1 overflow-y-auto">
+        {messages.length === 0 ? (
+          <>
+            {/* Analysis Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 px-2 sm:px-0 py-6">
+              {ANALYSIS_TYPES.map((type, i) => {
+                const Icon = type.icon;
+                return (
+                  <div key={i} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-700 transition-all">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                        <Icon size={24} className="text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">{type.title}</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{type.description}</p>
+                        <button
+                          onClick={() => handleSend(type.text)}
+                          className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        >
+                          Analyze
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Conversation Container */}
+            <div className="max-w-3xl mx-auto px-2 sm:px-0 py-6">
+              <div className="space-y-6">
+                {messages.map((msg, i) => (
+                  <InsightMessage key={i} role={msg.role} content={msg.content} />
+                ))}
+                {loading && (
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                      <Loader2 size={14} className="text-white animate-spin" />
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-sm p-4 flex items-center gap-2 text-sm text-gray-500 border border-gray-100 dark:border-gray-700 shadow-sm">
+                      <span className="inline-flex gap-1">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0ms]" />
+                        <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:150ms]" />
+                        <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:300ms]" />
+                      </span>
+                      Analyzing your data...
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
-      {/* Input */}
-      <div className="ai-input-section">
-        <div className="max-w-2xl mx-auto px-2 sm:px-0">
-          <div className="flex gap-2 items-end bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl border border-gray-200 dark:border-gray-700 shadow-2xl p-2">
+      {/* Input Bar */}
+      <div className="shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 px-2 sm:px-0 py-3">
+        <div className="max-w-3xl mx-auto">
+          <div className="relative bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md p-2">
             <textarea
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -199,21 +237,18 @@ export default function AIInsights() {
                   handleSend();
                 }
               }}
-              placeholder="Paste your data, metrics, or ask questions... (Shift+Enter for new line, Enter to send)"
-              className="ai-textarea flex-1 min-h-[44px] sm:min-h-[48px]"
+              placeholder="Ask me about revenue, churn, user trends, or growth..."
+              className="w-full text-sm bg-transparent text-gray-900 dark:text-white placeholder-gray-400 rounded-lg px-3 py-2 resize-y outline-none border-none min-h-[48px] sm:min-h-[52px] max-h-[120px] transition-all duration-200 ease-in-out"
             />
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white p-2 rounded-lg flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10"
+              className="absolute bottom-2.5 right-2.5 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center w-9 h-9"
               aria-label="Send message"
             >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             </button>
           </div>
-          <p className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 mt-1.5 text-center opacity-70 max-w-md mx-auto">
-            💡 Shift+Enter for new lines • Supports data analysis, trends, comparisons
-          </p>
         </div>
       </div>
     </div>
