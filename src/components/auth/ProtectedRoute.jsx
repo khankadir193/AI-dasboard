@@ -6,10 +6,9 @@ export default function ProtectedRoute({ children }) {
   const { user, loading } = useSelector((state) => state.auth)
   const { profile, isLoading: profileLoading } = useSelector((state) => state.profile)
 
-  // FIX: If we're still loading auth state OR profile is not ready, show loading
+  // If we're still loading auth state OR profile is not ready, show loading
   // This ensures profile is loaded before allowing access to protected routes
   if (loading || profileLoading || !profile) {
-    console.log("PROTECTED_ROUTE -> Loading:", loading, "ProfileLoading:", profileLoading, "Profile:", profile ? "ready" : "not ready")
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">

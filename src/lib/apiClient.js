@@ -37,10 +37,7 @@ export async function getAIInsight(prompt, options = {}) {
     return data.reply;
 
   } catch (error) {
-    console.error('Backend Proxy Error:', error);
-
     // Fallback to mock on any error
-    console.warn('Using mock response (backend unavailable)');
     return getMockInsight(prompt);
   }
 }

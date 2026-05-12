@@ -1,21 +1,16 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import { supabase } from '../../lib/supabaseClient'
+import {
+  fetchTenantDetails as fetchTenantDetailsService,
+  updateTenantSettings as updateTenantSettingsService,
+  fetchTenantUsers as fetchTenantUsersService
+} from '../../services/tenantService'
 
 // Async thunk for fetching tenant details
 export const fetchTenantDetails = createAsyncThunk(
   'tenant/fetchTenantDetails',
   async (tenantId, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', tenantId)
-        .maybeSingle()
-
-      if (error) throw error
-      if (!data) throw new Error('Company not found')
-      
-      return data
+      return await fetchTenantDetailsService(tenantId)
     } catch (error) {
       return rejectWithValue(error.message)
     }
@@ -27,17 +22,7 @@ export const updateTenantSettings = createAsyncThunk(
   'tenant/updateTenantSettings',
   async ({ tenantId, settings }, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('companies')
-        .update({ settings })
-        .eq('id', tenantId)
-        .select()
-        .maybeSingle()
-
-      if (error) throw error
-      if (!data) throw new Error('Company update failed')
-      
-      return data
+      return await updateTenantSettingsService(tenantId, settings)
     } catch (error) {
       return rejectWithValue(error.message)
     }
@@ -49,17 +34,7 @@ export const fetchTenantUsers = createAsyncThunk(
   'tenant/fetchTenantUsers',
   async (tenantId, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          user_auth:auth.users!inner(email, created_at)
-        `)
-        .eq('company_id', tenantId)
-
-      if (error) throw error
-      
-      return data
+      return await fetchTenantUsersService(tenantId)
     } catch (error) {
       return rejectWithValue(error.message)
     }

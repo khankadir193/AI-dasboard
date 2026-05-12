@@ -1,21 +1,16 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { supabase } from '../../lib/supabaseClient'
 import { getRolePermissions } from '../../utils/permissions'
+import { fetchProfile as fetchProfileService } from '../../services/profileService'
 
 // Async thunk for fetching user profile with tenant data
 export const fetchUserProfile = createAsyncThunk(
   'profile/fetchUserProfile',
   async (userId, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select("*, companies(*)")
-        .eq('id', userId)
-        .maybeSingle()
-
-      if (error) throw error
+      const data = await fetchProfileService(userId)
       if (!data) throw new Error('User profile not found')
-      
+
       return data
     } catch (error) {
       return rejectWithValue(error.message)
@@ -37,7 +32,7 @@ export const updateUserProfile = createAsyncThunk(
 
       if (error) throw error
       if (!data) throw new Error('Profile update failed')
-      
+
       return data
     } catch (error) {
       return rejectWithValue(error.message)

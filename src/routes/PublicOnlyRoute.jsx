@@ -15,9 +15,8 @@ export default function PublicOnlyRoute({ children }) {
     return <FullScreenLoader />
   }
 
-  // 🚨 If user exists, redirect to dashboard
+  // If user exists, redirect to dashboard
   if (user && user.id) {
-    console.log('[PublicOnlyRoute] User exists - redirecting to dashboard')
     return <Navigate to="/dashboard" replace />
   }
 

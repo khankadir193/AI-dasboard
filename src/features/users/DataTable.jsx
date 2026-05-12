@@ -158,7 +158,6 @@ export default function DataTable() {
   
   // Action handlers
   const handleViewUser = (user) => {
-    console.log('View user:', user)
     alert(`View User: ${user.displayName}\nEmail: ${user.email}\nRole: ${user.role}\nStatus: ${user.status}`)
     setActionMenuOpen(null)
   }
@@ -176,7 +175,6 @@ export default function DataTable() {
   
   const handleDeleteUser = (user) => {
     if (confirm(`Are you sure you want to delete ${user.displayName}?`)) {
-      console.log('Delete user:', user.id)
       setActionMenuOpen(null)
     }
   }

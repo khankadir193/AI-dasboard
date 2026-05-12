@@ -7,45 +7,32 @@ import { supabase } from '../lib/supabaseClient'
  */
 export async function fetchProfile(userId) {
   if (!userId) {
-    console.log('[profileService] fetchProfile called with null/undefined userId')
     return null
   }
-  
+
   try {
-    console.log('[profileService] Fetching profile for userId:', userId)
-    
-const { data, error } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(`
+        *,
+        companies:company_id (
+          id,
+          name
+        )
+      `)
       .eq('id', userId)
       .maybeSingle()
-    
+
     if (error) {
-      // Log the specific error for debugging
-      console.log('[profileService] Profile fetch error:', {
-        code: error.code,
-        message: error.message,
-        details: error.details
-      })
       return null
     }
-    
+
     if (!data) {
-      console.log('[profileService] No profile found for userId:', userId)
       return null
     }
-    
-    // Detailed logging for debugging
-    console.log('[profileService] Profile fetched successfully:', {
-      id: data?.id,
-      company_id: data?.company_id,
-      role: data?.role,
-      has_company: !!data?.company_id
-    })
-    
+
     return data
   } catch (e) {
-    console.log('[profileService] Fetch exception:', e.message)
     return null
   }
 }

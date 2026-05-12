@@ -29,7 +29,6 @@ class AuthService {
       if (error) throw error
       return data
     } catch (error) {
-      console.error('Sign in failed:', error)
       throw this.handleAuthError(error)
     }
   }
@@ -76,7 +75,6 @@ class AuthService {
       if (error) throw error
       return data
     } catch (error) {
-      console.error('Sign up failed:', error)
       throw this.handleAuthError(error)
     }
   }
@@ -87,7 +85,6 @@ class AuthService {
       if (error) throw error
       return true
     } catch (error) {
-      console.error('Sign out failed:', error)
       throw this.handleAuthError(error)
     }
   }
@@ -98,7 +95,6 @@ class AuthService {
       if (error) throw error
       return data
     } catch (error) {
-      console.error('Password reset failed:', error)
       throw this.handleAuthError(error)
     }
   }
@@ -111,7 +107,6 @@ class AuthService {
       if (error) throw error
       return data
     } catch (error) {
-      console.error('Password update failed:', error)
       throw this.handleAuthError(error)
     }
   }
@@ -123,7 +118,6 @@ class AuthService {
       if (error) throw error
       return user
     } catch (error) {
-      console.error('Get current user failed:', error)
       throw this.handleAuthError(error)
     }
   }
@@ -134,7 +128,6 @@ class AuthService {
       if (error) throw error
       return session
     } catch (error) {
-      console.error('Get session failed:', error)
       throw this.handleAuthError(error)
     }
   }
@@ -169,7 +162,6 @@ class AuthService {
       if (error) throw error
       return data
     } catch (error) {
-      console.error('Token refresh failed:', error)
       throw this.handleAuthError(error)
     }
   }

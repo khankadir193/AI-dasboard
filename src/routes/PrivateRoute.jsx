@@ -4,16 +4,15 @@ import FullScreenLoader from '../components/common/FullScreenLoader'
 
 export default function PrivateRoute({ children }) {
   const { user, loading } = useSelector((state) => state.auth)
+  const { profile, isLoading: profileLoading } = useSelector((state) => state.profile)
 
-  if (loading) {
+  // Show loader while checking auth
+  if (loading || profileLoading) {
     return <FullScreenLoader />
   }
 
-  console.log('[PrivateRoute] User:', {user,loading})
-
-  // ✅ ONLY check user
-  if (!user || !user.id) {
-    console.log('[PrivateRoute] BLOCK - No user, redirecting to signin')
+  // STRICT CHECK: Must have user AND valid profile with company_id
+  if (!user || !user.id || !profile || !profile.company_id) {
     return <Navigate to="/signin" replace />
   }
 

@@ -19,16 +19,11 @@ export default function RootRedirect() {
     return <FullScreenLoader />
   }
 
-  // ---------------------------------------------------------
   // STRICT CHECK: Must have user AND valid profile with company_id
-  // Profile comes from profileSlice
-  // ---------------------------------------------------------
   if (user && user.id && profile && profile.company_id) {
-    console.log('[RootRedirect] Valid user + profile - redirecting to dashboard')
     return <Navigate to="/dashboard" replace />
   }
 
   // Any invalid state - redirect to signin
-  console.log('[RootRedirect] No valid user/profile - redirecting to signin')
   return <Navigate to="/signin" replace />
 }

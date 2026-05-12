@@ -26,42 +26,50 @@ export default function AuthProvider({ children }) {
     let isMounted = true
 
     /**
-     * initializeAuth - SIMPLIFIED
-     * - Get session
-     * - If session exists → setUser AND fetchUserProfile (via async thunk)
+     * initializeAuth - SECURE
+     * - Step 1: Get user (validates token legitimacy)
+     * - Step 2: If user exists → get session → fetch profile
+     * - Step 3: Validate profile has company_id
      * - ALWAYS sets loading=false to prevent stuck UI
      */
     const initializeAuth = async () => {
       try {
         dispatch(setLoading(true))
 
-        // Get session only
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        // Step 1: Get user (validates token is legitimate)
+        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser()
 
         if (!isMounted) return
 
-        // If no session or error - clear and finish
-        if (!session || sessionError) {
+        // If no user or error - force signOut and clear
+        if (!authUser || userError) {
+          await supabase.auth.signOut()
           dispatch(clearUser())
           dispatch(clearProfile())
+          dispatch(clearTenant())
+          dispatch(clearProjects())
           dispatch(setLoading(false))
           setIsInitialized(true)
           return
         }
 
-        // Session exists - set user
-        dispatch(setUser(session.user))
-
-        // Fetch profile via async thunk
-        dispatch(fetchUserProfile(session.user.id))
+        // Step 2: Get session and fetch profile
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          dispatch(setUser(session.user))
+          dispatch(fetchUserProfile(session.user.id))
+        }
 
         dispatch(setLoading(false))
         setIsInitialized(true)
 
       } catch (error) {
-        // On any error, still complete loading to prevent stuck
+        // On any error, force signOut and clear
+        await supabase.auth.signOut()
         dispatch(clearUser())
         dispatch(clearProfile())
+        dispatch(clearTenant())
+        dispatch(clearProjects())
         dispatch(setLoading(false))
         setIsInitialized(true)
       }
