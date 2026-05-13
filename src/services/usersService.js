@@ -25,7 +25,7 @@ export const fetchAllUsers = async () => {
     .eq('id', authUid)
     .maybeSingle()
 
-  if (myProfileError) throw myProfileError
+  if (myProfileError) throw new Error(myProfileError.message || 'Failed to fetch profile')
   if (!myProfile?.company_id) return []
 
   const tenantCompanyId = myProfile.company_id
@@ -43,7 +43,7 @@ export const fetchAllUsers = async () => {
     .eq('company_id', tenantCompanyId)
 
   if (error) {
-    throw error
+    throw new Error(error.message || 'Failed to fetch users')
   }
 
   const users = (profiles || []).map((profile) => {
@@ -95,7 +95,7 @@ export const updateUserRole = async ({ userId, role }) => {
     .select()
     .maybeSingle()
 
-  if (error) throw error
+  if (error) throw new Error(error.message || 'Failed to update user role')
   return data
 }
 
@@ -110,6 +110,6 @@ export const toggleUserStatus = async ({ userId, is_active }) => {
     .select()
     .maybeSingle()
 
-  if (error) throw error
+  if (error) throw new Error(error.message || 'Failed to toggle user status')
   return data
 }

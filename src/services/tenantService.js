@@ -10,8 +10,8 @@ export const fetchTenantDetails = async (tenantId) => {
     .eq('id', tenantId)
     .maybeSingle()
 
-  if (error) throw new Error(error.message)
-  if (!data) throw new Error('Company not found')
+  if (error) throw new Error(error.message || 'Failed to fetch company')
+  if (!data) return null
 
   return data
 }
@@ -27,8 +27,8 @@ export const updateTenantSettings = async (tenantId, settings) => {
     .select()
     .maybeSingle()
 
-  if (error) throw new Error(error.message)
-  if (!data) throw new Error('Company update failed')
+  if (error) throw new Error(error.message || 'Failed to update company')
+  if (!data) return null
 
   return data
 }
@@ -42,7 +42,7 @@ export const fetchTenantUsers = async (tenantId) => {
     .select('*')
     .eq('company_id', tenantId)
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(error.message || 'Failed to fetch users')
 
-  return data
+  return data || []
 }

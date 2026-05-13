@@ -5,10 +5,6 @@
 
 export async function registerChatRoutes(app) {
   app.post('/api/chat', async (req, res) => {
-    if (req.method !== "POST") {
-      return res.status(405).json({ message: "Method not allowed" });
-    }
-
     try {
       const { message } = req.body;
 
@@ -24,7 +20,7 @@ export async function registerChatRoutes(app) {
       });
 
       res.status(200).json({
-        reply: completion.choices[0].message.content,
+        reply: completion.choices?.[0]?.message?.content || 'No response',
       });
     } catch (error) {
       res.status(500).json({ error: 'AI service unavailable' });

@@ -152,8 +152,13 @@ class AuthService {
   }
 
   // Utility methods
-  isAuthenticated() {
-    return supabase.auth.getUser() !== null
+  async isAuthenticated() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      return user !== null
+    } catch (error) {
+      return false
+    }
   }
 
   async refreshToken() {

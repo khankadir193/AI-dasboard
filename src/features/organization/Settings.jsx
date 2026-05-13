@@ -72,10 +72,18 @@ export default function Settings() {
     const savedApiKey = localStorage.getItem('settings_apiKey')
     
     if (savedNotifications) {
-      setNotifications(JSON.parse(savedNotifications))
+      try {
+        setNotifications(JSON.parse(savedNotifications))
+      } catch (e) {
+        console.error('Failed to parse notifications:', e)
+      }
     }
     if (savedAnalytics) {
-      setAnalytics(JSON.parse(savedAnalytics))
+      try {
+        setAnalytics(JSON.parse(savedAnalytics))
+      } catch (e) {
+        console.error('Failed to parse analytics:', e)
+      }
     }
     if (savedApiKey) {
       setApiKey(savedApiKey)
@@ -154,7 +162,7 @@ export default function Settings() {
             <label className="block text-xs font-medium text-gray-500 mb-1">Role</label>
             <input
               type="text"
-              value={profile.role ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1).toLowerCase() : ''}
+              value={profile.role && profile.role.length > 0 ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1).toLowerCase() : ''}
               readOnly
               className="w-full text-sm bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-gray-500 dark:text-gray-400 outline-none cursor-not-allowed"
             />
@@ -284,12 +292,22 @@ export default function Settings() {
             <label className="block text-xs font-medium text-gray-500 mb-1">Last Login</label>
             <input
               type="text"
-              value={authUser?.last_sign_in_at ? new Date(authUser.last_sign_in_at).toLocaleString() : 'N/A'}
+              value={(() => {
+                if (!authUser?.last_sign_in_at) return 'N/A'
+                try {
+                  const date = new Date(authUser.last_sign_in_at)
+                  if (isNaN(date.getTime())) return 'N/A'
+                  return date.toLocaleString()
+                } catch (e) {
+                  return 'N/A'
+                }
+              })()}
               readOnly
               className="w-full text-sm bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-gray-500 dark:text-gray-400 outline-none cursor-not-allowed"
             />
           </div>
           <button
+            onClick={() => alert('Password change feature coming soon')}
             className="w-full text-sm px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl transition-colors"
           >
             Change Password
