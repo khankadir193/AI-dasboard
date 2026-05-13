@@ -1,12 +1,6 @@
-# TODO - Users table rendering fix
+# TODO
 
-- [x] Fix `fetchAllUsers` in `src/store/slices/usersSlice.js` to:
-  - [x] get logged-in user's `company_id` from `profiles` using `auth.uid()`
-  - [x] fetch `profiles` scoped to that `company_id`
-  - [x] join `companies` to get `company.name`
-  - [x] map join result robustly (object/array/null)
-  - [x] improve `displayName` using `first_name/last_name` fallback to email
-- [x] Fix unstable row keys in `src/features/users/DataTable.jsx` (remove `Math.random()`)
-- [ ] Sanity test by running app / checking console for Supabase join/mapping errors
-
+- [ ] Update `src/features/auth/SignIn.jsx` with premium split-screen auth layout, polished card, modern input/button/link styling, accessible focus states, and subtle entrance animation.
+- [ ] Update `src/features/auth/Signup.jsx` with the same premium split-screen layout and UI system; keep all existing fields/logic/navigation intact.
+- [ ] Verify responsiveness (mobile/tablet/desktop/ultrawide) and dark mode readability.
 
