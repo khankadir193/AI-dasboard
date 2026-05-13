@@ -426,7 +426,10 @@ export default function DataTable() {
               </div>
             )}
           </div>
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+          <button
+            onClick={() => alert('Add User feature coming soon')}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
             <Plus size={16} />
             Add User
           </button>
