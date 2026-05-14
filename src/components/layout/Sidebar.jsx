@@ -11,17 +11,24 @@ import {
   Lock,
   Building2,
   FolderKanban,
+  Bell,
+  History,
 } from 'lucide-react'
+
 import clsx from 'clsx'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/ai-insights', icon: Sparkles, label: 'AI Insights' },
-  { to: '/data-table', icon: Table2, label: 'Data Table' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
+  { to: '/data-table', icon: Table2, label: 'Team Management' },
+  { to: '/activity-logs', icon: History, label: 'Activity Logs' },
+  { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]
+
+
 
 const authItems = [
   { to: '/signin',    icon: Lock,             label: 'Sign In'    },

@@ -109,10 +109,10 @@ export default function DataTable() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Users
+            Team Management
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Manage and view all registered users in your workspace.
+            Manage team members, roles, and workspace access.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -124,14 +124,15 @@ export default function DataTable() {
             onExportPDF={handleExportPDF}
           />
           <button
-            onClick={() => alert('Add User feature coming soon')}
+            onClick={() => alert('Invite Member coming soon (UI only)')}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             <Plus size={16} />
-            Add User
+            Invite Member
           </button>
         </div>
       </div>
+
 
       {/* Filter Bar */}
       <FilterBar

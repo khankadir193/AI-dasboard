@@ -34,7 +34,11 @@ export default function App() {
           <Route path="/ai-insights" element={<AIInsights />} />
           <Route path="/data-table" element={<DataTable />} />
           <Route path="/projects" element={<Projects />} />
+          {/* Placeholders for enterprise sections (no functionality yet) */}
+          <Route path="/activity-logs" element={<DataTable />} />
+          <Route path="/notifications" element={<DataTable />} />
           <Route path="/settings" element={<Settings />} />
+
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
