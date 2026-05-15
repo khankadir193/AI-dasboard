@@ -7,9 +7,9 @@ export const PAGE_SIZE = 5
 // Role color mappings - matching schema: admin, manager, analyst, viewer
 export const ROLE_COLORS = {
   'admin': 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100',
-  'manager': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100',
-  'analyst': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-800 dark:text-cyan-100',
-  'viewer': 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+'manager': 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100',
+  'analyst': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100',
+  'viewer': 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100'
 }
 
 // Status color mappings

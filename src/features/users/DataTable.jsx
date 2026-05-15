@@ -53,7 +53,7 @@ export default function DataTable() {
   // Invite Member (UI-only placeholder workflow)
   const [isInviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState('Member')
+  const [inviteRole, setInviteRole] = useState('Analyst')
   const [inviteMessage, setInviteMessage] = useState("You've been invited to join the InsightAI workspace.")
   const [isSending, setIsSending] = useState(false)
 
@@ -152,6 +152,7 @@ export default function DataTable() {
   }
 
   const handleSendInvite = async (e) => {
+
     e?.preventDefault?.()
     if (isSending) return
 
@@ -188,10 +189,10 @@ export default function DataTable() {
         inviteRole === 'Admin'
           ? 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100'
           : inviteRole === 'Manager'
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100'
-            : inviteRole === 'Viewer'
-              ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
-              : 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200',
+            ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+            : inviteRole === 'Analyst'
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100'
+              : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100',
       status: PENDING_STATUS,
       statusClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200',
       joinedAt: 'N/A',
@@ -203,7 +204,7 @@ export default function DataTable() {
 
     setIsSending(false)
     setInviteEmail('')
-    setInviteRole('Member')
+    setInviteRole('Analyst')
     setInviteMessage("You've been invited to join the InsightAI workspace.")
     setInviteOpen(false)
 
@@ -369,7 +370,7 @@ export default function DataTable() {
                 >
                   <option value="Admin">Admin</option>
                   <option value="Manager">Manager</option>
-                  <option value="Member">Member</option>
+                  <option value="Analyst">Analyst</option>
                   <option value="Viewer">Viewer</option>
                 </select>
 
@@ -388,19 +389,19 @@ export default function DataTable() {
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
                         Manager
                       </span>
-                      <span className="text-xs text-gray-600 dark:text-gray-300">Manage projects and members</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-300">Manage projects and team operations</span>
                     </div>
                     <div className="flex items-start gap-2">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-                        Member
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                        Analyst
                       </span>
-                      <span className="text-xs text-gray-600 dark:text-gray-300">Standard workspace access</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-300">Access analytics, dashboards, and reports</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200">
                         Viewer
                       </span>
-                      <span className="text-xs text-gray-600 dark:text-gray-300">Read-only access</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-300">Read-only workspace access</span>
                     </div>
                   </div>
                 </div>
