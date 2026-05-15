@@ -1,4 +1,5 @@
 import { Menu, Bell, Sun, Moon, Search } from 'lucide-react'
+
 import { useTheme } from '../../context/ThemeContext'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
@@ -77,10 +78,11 @@ export default function Header({ onMenuClick }) {
         <button onClick={toggleTheme} className="btn-ghost p-2" title="Toggle theme">
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <button className="btn-ghost p-2 relative">
+
+        <button className="btn-ghost p-2 relative" type="button" title="Notifications">
           <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
         </button>
+
         <button
           onClick={handleSignOut}
           disabled={loading}

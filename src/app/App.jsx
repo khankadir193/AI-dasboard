@@ -6,6 +6,8 @@ import AIInsights from '../features/ai/AIInsights.jsx'
 import DataTable from '../features/users/DataTable.jsx'
 import Projects from '../features/projects/Projects.jsx'
 import Settings from '../features/organization/Settings.jsx'
+import ActivityLogs from '../pages/activity-logs/ActivityLogs.jsx'
+import Notifications from '../pages/notifications/Notifications.jsx'
 import SignIn from '../features/auth/SignIn.jsx'
 import SignUp from '../features/auth/Signup.jsx'
 import AuthProvider from '../providers/AuthProvider'
@@ -34,9 +36,9 @@ export default function App() {
           <Route path="/ai-insights" element={<AIInsights />} />
           <Route path="/data-table" element={<DataTable />} />
           <Route path="/projects" element={<Projects />} />
-          {/* Placeholders for enterprise sections (no functionality yet) */}
-          <Route path="/activity-logs" element={<DataTable />} />
-          <Route path="/notifications" element={<DataTable />} />
+          {/* Enterprise sections */}
+          <Route path="/activity-logs" element={<ActivityLogs />} />
+          <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<Settings />} />
 
         </Route>

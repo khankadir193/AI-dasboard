@@ -1,6 +1,10 @@
 # TODO
 
-- [ ] Update `src/features/auth/SignIn.jsx` with premium split-screen auth layout, polished card, modern input/button/link styling, accessible focus states, and subtle entrance animation.
-- [ ] Update `src/features/auth/Signup.jsx` with the same premium split-screen layout and UI system; keep all existing fields/logic/navigation intact.
-- [ ] Verify responsiveness (mobile/tablet/desktop/ultrawide) and dark mode readability.
+## Activity Logs + Notifications (Enterprise UI polish)
+
+- [ ] Implement Activity Logs module (new pages/components) using existing `analytics_data` events.
+- [ ] Implement Notifications module (new pages/components) using existing `analytics_data` events + UI-only placeholder notifications.
+- [ ] Update routing in `src/app/App.jsx` to point to new pages.
+- [ ] Add unread count badge UI to Header bell using local UI state (persisted per-tenant in localStorage).
+- [ ] Run dev build / verify routes `/activity-logs` and `/notifications`.
 
