@@ -3,6 +3,13 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useUsers } from '../../hooks/useFetch'
 import { updateUserRole, toggleUserStatus } from '../../store/slices/usersSlice'
+import {
+  createInvite,
+  getPendingInvitesForCompany,
+  cancelInvite,
+  resendInvite
+} from '../../services/invitesService'
+
 
 // Import custom hooks
 import {
@@ -43,7 +50,13 @@ export default function DataTable() {
   const { data: rawUsers, isLoading, error } = useUsers()
   const users = useMemo(() => formatUsers(rawUsers), [rawUsers])
   const profile = useSelector(state => state.profile.profile)
-  const isAdmin = profile?.role === 'admin'
+  const currentRole = profile?.role
+  const canInvite = currentRole === 'admin' || currentRole === 'manager'
+  const isAdmin = currentRole === 'admin'
+  const companyId = profile?.company_id
+
+
+
 
   // Use custom hooks for state management
   const filterState = useTableFilters()
@@ -86,10 +99,9 @@ export default function DataTable() {
   }
 
   const displayUsers = useMemo(() => {
-    // UI-only: merge backend users with locally created pending invite rows.
-    // Do not change backend or API flow.
     return [...pendingInvites, ...(users || [])]
   }, [pendingInvites, users])
+
 
   // Apply filters and sorting
   const filteredUsers = useTableFiltering(
@@ -152,9 +164,18 @@ export default function DataTable() {
   }
 
   const handleSendInvite = async (e) => {
-
     e?.preventDefault?.()
     if (isSending) return
+
+    if (!canInvite) {
+      showToast('You do not have permission to invite members')
+      return
+    }
+
+    if (!companyId) {
+      showToast('Company context not ready')
+      return
+    }
 
     if (!inviteEmail || !validateEmail(inviteEmail)) {
       showToast('Please enter a valid email address')
@@ -162,53 +183,28 @@ export default function DataTable() {
     }
 
     setIsSending(true)
+    try {
+      const dbRole = String(inviteRole || '').toLowerCase().trim()
 
-    // UI-only placeholder: simulate request latency without backend changes.
-    await new Promise(resolve => setTimeout(resolve, 600))
+      const pendingRow = await createInvite({
+        email: inviteEmail.trim(),
+        role: dbRole,
+        companyId
+      })
 
-    const tempId = `pending_${Date.now()}_${Math.random().toString(16).slice(2)}`
-    const initials = (inviteEmail.split('@')[0] || 'U')
-      .replace(/[._-]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase())
-      .split(' ')
-      .filter(Boolean)
-      .map(w => w[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || 'U'
+      // Render pending invite immediately
+      setPendingInvites(prev => [pendingRow, ...prev])
 
-    const pendingRow = {
-      id: tempId,
-      formattedId: `#INV-${Math.floor(Math.random() * 9000 + 1000)}`,
-      displayName: inviteEmail.split('@')[0] ? inviteEmail.split('@')[0].replace(/[._-]/g, ' ') : 'Pending Member',
-      initials,
-      email: inviteEmail,
-      companyName: 'Pending invite',
-      role: inviteRole,
-      roleClass:
-        inviteRole === 'Admin'
-          ? 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100'
-          : inviteRole === 'Manager'
-            ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
-            : inviteRole === 'Analyst'
-              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100'
-              : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100',
-      status: PENDING_STATUS,
-      statusClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200',
-      joinedAt: 'N/A',
-      avatarGradient: 'from-amber-400 to-amber-600',
-      isActive: false
+      showToast('Invitation sent successfully')
+      setInviteEmail('')
+      setInviteRole('Analyst')
+      setInviteMessage("You've been invited to join the InsightAI workspace.")
+      setInviteOpen(false)
+    } catch (err) {
+      showToast(err?.message || 'Failed to send invitation')
+    } finally {
+      setIsSending(false)
     }
-
-    setPendingInvites(prev => [pendingRow, ...prev])
-
-    setIsSending(false)
-    setInviteEmail('')
-    setInviteRole('Analyst')
-    setInviteMessage("You've been invited to join the InsightAI workspace.")
-    setInviteOpen(false)
-
-    showToast('Invitation sent successfully')
   }
 
   return (
