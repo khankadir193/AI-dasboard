@@ -11,10 +11,16 @@ export function UserTableRow({
   onView,
   onEditRole,
   onToggleStatus,
-  onDelete
+  onDelete,
+  onResendInviteUI,
+  onCancelPendingInviteUI,
+  onCopyInviteLinkUI
 }) {
+  const isPending = user?.status === 'Pending'
+
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
       {/* ID */}
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
         {user?.formattedId || 'N/A'}
@@ -24,12 +30,17 @@ export function UserTableRow({
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="flex items-center gap-3">
           <div
-            className={`w-10 h-10 rounded-full bg-gradient-to-br ${
-              user?.avatarGradient || 'from-gray-400 to-gray-600'
-            } flex items-center justify-center text-white text-sm font-semibold flex-shrink-0`}
+            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${
+              isPending
+                ? 'bg-yellow-50 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 ring-1 ring-yellow-200/70 dark:ring-yellow-800/30'
+                : 'bg-gradient-to-br text-white'
+            } ${
+              !isPending ? (user?.avatarGradient || 'from-gray-400 to-gray-600') : ''
+            }`}
           >
-            {user?.initials || 'U'}
+            {isPending ? 'P' : user?.initials || 'U'}
           </div>
+
           <div>
             <p className="text-sm font-medium text-gray-900 dark:text-white">
               {user?.displayName || 'Unknown'}
@@ -91,38 +102,68 @@ export function UserTableRow({
 
         {/* Action Menu Dropdown */}
         {isActionMenuOpen === user?.id && (
-          <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
-            <button
-              onClick={() => onView(user)}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-            >
-              <Eye size={14} />
-              View User
-            </button>
-            <button
-              onClick={() => onEditRole(user)}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-            >
-              <Edit2 size={14} />
-              Edit Role
-            </button>
-            <button
-              onClick={() => onToggleStatus(user)}
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
-            >
-              <Ban size={14} />
-              {user.isActive ? 'Suspend User' : 'Activate User'}
-            </button>
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-            <button
-              onClick={() => onDelete(user)}
-              className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-            >
-              <Trash2 size={14} />
-              Delete User
-            </button>
+          <div className="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+            {isPending ? (
+              <>
+                <button
+                  onClick={() => onResendInviteUI?.(user)}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <Eye size={14} />
+                  Resend Invite
+                </button>
+                <button
+                  onClick={() => onCancelPendingInviteUI?.(user)}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <Ban size={14} />
+                  Cancel Invite
+                </button>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                <button
+                  onClick={() => onCopyInviteLinkUI?.(user)}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <Edit2 size={14} />
+                  Copy Invite Link
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => onView(user)}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <Eye size={14} />
+                  View User
+                </button>
+                <button
+                  onClick={() => onEditRole(user)}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <Edit2 size={14} />
+                  Edit Role
+                </button>
+                <button
+                  onClick={() => onToggleStatus(user)}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                >
+                  <Ban size={14} />
+                  {user.isActive ? 'Suspend User' : 'Activate User'}
+                </button>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                <button
+                  onClick={() => onDelete(user)}
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                >
+                  <Trash2 size={14} />
+                  Remove User
+                </button>
+              </>
+            )}
           </div>
         )}
+
       </td>
     </tr>
   )

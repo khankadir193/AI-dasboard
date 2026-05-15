@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useUsers } from '../../hooks/useFetch'
 import { updateUserRole, toggleUserStatus } from '../../store/slices/usersSlice'
 
-
 // Import custom hooks
 import {
   useTableFilters,
@@ -16,7 +15,7 @@ import {
 } from './useTableHooks'
 
 // Import utilities
-import { formatUsers, buildExportData } from './tableUtils'
+import { formatUsers } from './tableUtils'
 
 // Import constants
 import { PAGE_SIZE, TABLE_COLUMNS } from './tableConstants'
@@ -30,11 +29,7 @@ import { UserTableRow } from './components/UserTableRow'
 import { TablePagination } from './components/TablePagination'
 import { FilterBar } from './components/FilterBar'
 import { ExportMenu } from './components/ExportMenu'
-import {
-  TableLoadingState,
-  TableErrorState,
-  TableEmptyState
-} from './components/TableStates'
+import { TableLoadingState, TableErrorState, TableEmptyState } from './components/TableStates'
 
 import Modal from '../../components/common/Modal'
 import Input from '../../components/ui/Input'
@@ -44,7 +39,6 @@ import Button from '../../components/ui/Button'
 const PENDING_STATUS = 'Pending'
 
 export default function DataTable() {
-
   const dispatch = useDispatch()
   const { data: rawUsers, isLoading, error } = useUsers()
   const users = useMemo(() => formatUsers(rawUsers), [rawUsers])
@@ -88,10 +82,8 @@ export default function DataTable() {
 
   const validateEmail = (value) => {
     if (!value) return false
-    // Simple enterprise-safe email validation
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
   }
-
 
   const displayUsers = useMemo(() => {
     // UI-only: merge backend users with locally created pending invite rows.
@@ -108,7 +100,6 @@ export default function DataTable() {
     filterState.dateRange
   )
 
-
   const sortedUsers = useTableSorting(
     filteredUsers,
     sortState.sortField,
@@ -118,8 +109,9 @@ export default function DataTable() {
   // Pagination
   const pagination = useTablePagination(sortedUsers, PAGE_SIZE)
 
-  const inviteEmailError = inviteEmail ? (validateEmail(inviteEmail) ? '' : 'Enter a valid email address') : ''
-
+  const inviteEmailError = inviteEmail
+    ? (validateEmail(inviteEmail) ? '' : 'Enter a valid email address')
+    : ''
 
   // Export handlers
   const handleExportCSV = () => {
@@ -135,25 +127,25 @@ export default function DataTable() {
   }
 
   // Action handlers
-  const handleViewUser = user => {
+  const handleViewUser = (user) => {
     alert(
       `View User: ${user.displayName}\nEmail: ${user.email}\nRole: ${user.role}\nStatus: ${user.status}`
     )
     setActionMenuOpen(null)
   }
 
-  const handleEditRole = user => {
+  const handleEditRole = (user) => {
     const newRole = user.role === 'Admin' ? 'Viewer' : 'Admin'
     dispatch(updateUserRole({ userId: user.id, role: newRole.toLowerCase() }))
     setActionMenuOpen(null)
   }
 
-  const handleToggleStatus = user => {
+  const handleToggleStatus = (user) => {
     dispatch(toggleUserStatus({ userId: user.id, is_active: !user.isActive }))
     setActionMenuOpen(null)
   }
 
-  const handleDeleteUser = user => {
+  const handleDeleteUser = (user) => {
     if (confirm(`Are you sure you want to delete ${user.displayName}?`)) {
       setActionMenuOpen(null)
     }
@@ -192,13 +184,14 @@ export default function DataTable() {
       email: inviteEmail,
       companyName: 'Pending invite',
       role: inviteRole,
-      roleClass: inviteRole === 'Admin'
-        ? 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100'
-        : inviteRole === 'Manager'
-          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100'
-          : inviteRole === 'Viewer'
-            ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
-            : 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200',
+      roleClass:
+        inviteRole === 'Admin'
+          ? 'bg-purple-100 text-purple-800 dark:bg-purple-800 dark:text-purple-100'
+          : inviteRole === 'Manager'
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100'
+            : inviteRole === 'Viewer'
+              ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'
+              : 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200',
       status: PENDING_STATUS,
       statusClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200',
       joinedAt: 'N/A',
@@ -219,13 +212,10 @@ export default function DataTable() {
 
   return (
     <div className="space-y-6">
-
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Team Management
-          </h1>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Team Management</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Manage team members, roles, and workspace access.
           </p>
@@ -245,10 +235,8 @@ export default function DataTable() {
             <Plus size={16} />
             Invite Member
           </button>
-
         </div>
       </div>
-
 
       {/* Filter Bar */}
       <FilterBar
@@ -271,9 +259,7 @@ export default function DataTable() {
       {/* Table Card */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto min-h-[420px] [scrollbar-width:thin]">
-
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-            {/* Table Header */}
             <SortableTableHeader
               columns={TABLE_COLUMNS}
               sortField={sortState.sortField}
@@ -284,14 +270,18 @@ export default function DataTable() {
               }}
             />
 
-            {/* Table Body */}
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {isLoading ? (
                 <TableLoadingState />
               ) : error ? (
                 <TableErrorState error={error} />
               ) : pagination.paginated.length === 0 ? (
-                <TableEmptyState onClearFilters={filterState.clearFilters} />
+                <TableEmptyState
+                  onClearFilters={filterState.clearFilters}
+                  onInvite={((users?.length || 0) === 0 && pendingInvites.length === 0)
+                    ? () => setInviteOpen(true)
+                    : undefined}
+                />
               ) : (
                 pagination.paginated.map(user => (
                   <UserTableRow
@@ -304,6 +294,19 @@ export default function DataTable() {
                     onEditRole={handleEditRole}
                     onToggleStatus={handleToggleStatus}
                     onDelete={handleDeleteUser}
+                    onResendInviteUI={(u) => {
+                      setActionMenuOpen(null)
+                      showToast('Resend invite requested')
+                    }}
+                    onCancelPendingInviteUI={(u) => {
+                      setActionMenuOpen(null)
+                      setPendingInvites(prev => prev.filter(p => p.id !== u?.id))
+                      showToast('Invitation canceled')
+                    }}
+                    onCopyInviteLinkUI={(u) => {
+                      setActionMenuOpen(null)
+                      showToast('Copy link is not configured')
+                    }}
                   />
                 ))
               )}
@@ -322,6 +325,8 @@ export default function DataTable() {
             isDisabled={false}
           />
         )}
+
+        {/* Invite Member Modal */}
         <Modal
           isOpen={isInviteOpen}
           onClose={closeInvite}
@@ -330,92 +335,127 @@ export default function DataTable() {
           closeOnBackdrop
           showCloseButton
         >
-          <form onSubmit={handleSendInvite} className="space-y-5">
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                Email Address
-              </label>
-              <Input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="john@company.com"
-                disabled={isSending}
-                error={inviteEmailError || undefined}
-                aria-invalid={!!inviteEmailError}
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {inviteEmailError ? inviteEmailError : 'Send an invitation email to add a new member.'}
-              </p>
-            </div>
+          <div className="max-h-[calc(100vh-10rem)] overflow-y-auto pr-0.5">
+            <form onSubmit={handleSendInvite} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-gray-900 dark:text-white">
+                  Email Address
+                </label>
+                <Input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="john@company.com"
+                  disabled={isSending}
+                  error={inviteEmailError || undefined}
+                  aria-invalid={!!inviteEmailError}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {inviteEmailError
+                    ? inviteEmailError
+                    : 'Send an invitation email to add a new member.'}
+                </p>
+              </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                Role
-              </label>
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value)}
-                disabled={isSending}
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              >
-                <option value="Admin">Admin</option>
-                <option value="Manager">Manager</option>
-                <option value="Member">Member</option>
-                <option value="Viewer">Viewer</option>
-              </select>
-            </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-white">
+                  Role
+                </label>
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  disabled={isSending}
+                  className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                >
+                  <option value="Admin">Admin</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Member">Member</option>
+                  <option value="Viewer">Viewer</option>
+                </select>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                Optional Message
-              </label>
-              <textarea
-                value={inviteMessage}
-                onChange={(e) => setInviteMessage(e.target.value)}
-                disabled={isSending}
-                placeholder="You've been invited to join the InsightAI workspace."
-                rows={3}
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-900/30 p-3">
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-200 mb-2">
+                    Role access (what they can do)
+                  </p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
+                        Admin
+                      </span>
+                      <span className="text-xs text-gray-600 dark:text-gray-300">Full workspace access</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                        Manager
+                      </span>
+                      <span className="text-xs text-gray-600 dark:text-gray-300">Manage projects and members</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                        Member
+                      </span>
+                      <span className="text-xs text-gray-600 dark:text-gray-300">Standard workspace access</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-200">
+                        Viewer
+                      </span>
+                      <span className="text-xs text-gray-600 dark:text-gray-300">Read-only access</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={isSending}
-                onClick={closeInvite}
-                className="w-full sm:w-auto"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                loading={isSending}
-                disabled={isSending || !inviteEmail || !!inviteEmailError}
-                className="w-full sm:w-auto"
-              >
-                Send Invite
-              </Button>
-            </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-white">
+                  Optional Message
+                </label>
 
-            <div className="flex items-center gap-2 pt-1">
-              <Badge variant="warning" size="sm">
-                Pending
-              </Badge>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                This UI adds a pending member row locally only.
-              </span>
-            </div>
-          </form>
+                <textarea
+                  value={inviteMessage}
+                  onChange={(e) => setInviteMessage(e.target.value)}
+                  disabled={isSending}
+                  placeholder="You've been invited to join the InsightAI workspace."
+                  rows={2}
+                  className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={isSending}
+                  onClick={closeInvite}
+                  className="w-full sm:w-auto"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  loading={isSending}
+                  disabled={isSending || !inviteEmail || !!inviteEmailError}
+                  className="w-full sm:w-auto"
+                >
+                  Send Invite
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <Badge variant="warning" size="sm">Pending</Badge>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  This UI adds a pending member row locally only.
+                </span>
+              </div>
+            </form>
+          </div>
         </Modal>
 
         {/* Minimal toast/snackbar */}
         {toast && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60]">
-            <div className="bg-gray-900 text-white px-4 py-3 rounded-lg shadow-lg text-sm">
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60]" aria-live="polite" role="status">
+            <div className="bg-gray-900 text-white px-4 py-3 rounded-lg shadow-lg text-sm max-w-[90vw]">
               {toast.message}
             </div>
           </div>
