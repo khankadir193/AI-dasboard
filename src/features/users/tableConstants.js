@@ -15,8 +15,12 @@ export const ROLE_COLORS = {
 // Status color mappings
 export const STATUS_COLORS = {
   'Active': 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100',
-  'Inactive': 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+  'Pending': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200',
+  'Inactive': 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100',
+  // Future-safe semantic mapping (does not change existing business logic)
+  'Suspended': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-100'
 }
+
 
 // Avatar gradient options - deterministic based on index
 export const AVATAR_GRADIENTS = [

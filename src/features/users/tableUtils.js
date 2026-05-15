@@ -71,6 +71,7 @@ export const getStatusClass = (status) => {
   return STATUS_COLORS[status] || STATUS_COLORS['Active']
 }
 
+
 /**
  * Get avatar gradient based on index
  */
