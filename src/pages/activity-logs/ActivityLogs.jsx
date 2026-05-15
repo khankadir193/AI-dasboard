@@ -30,15 +30,16 @@ const EVENT_DEFS = {
   },
   dashboard_view: {
     label: 'Dashboard viewed',
-    badgeVariant: 'outline',
-    badgeText: 'gray'
+    badgeVariant: 'slate',
+    badgeText: 'slate'
   },
   active_users: {
     label: 'User login',
-    badgeVariant: 'secondary',
+    badgeVariant: 'purple',
     badgeText: 'purple'
   }
 }
+
 
 const DEFAULT_FILTER = 'all'
 
@@ -121,18 +122,34 @@ export default function ActivityLogs() {
   const filtered = useMemo(() => {
     const q = safeLower(query).trim()
 
+    const getEventType = (ev) => {
+      // Keep backwards compatibility with whatever analytics payload exists.
+      return ev?.metric_type || ev?.metric_key || ev?.type || ''
+    }
+
     return (events || [])
       .filter((ev) => {
         if (typeFilter === DEFAULT_FILTER) return true
-        return ev.metric_type === typeFilter
+        return getEventType(ev) === typeFilter
       })
       .filter((ev) => {
         if (!q) return true
-        const label = EVENT_DEFS[ev.metric_type]?.label || ev.metric_type
-        const userStr = safeLower(ev?.metadata?.email || ev?.metadata?.user || ev?.metadata?.username || '')
-        return safeLower(label).includes(q) || userStr.includes(q)
+        const eventType = getEventType(ev)
+        const label = EVENT_DEFS[eventType]?.label || eventType
+        const userStr = safeLower(
+          ev?.metadata?.email ||
+            ev?.metadata?.user ||
+            ev?.metadata?.username ||
+            ev?.metadata?.displayName ||
+            ''
+        )
+
+        // Optional: include lightweight keyword search from metadata values (without deep refactors)
+        const metadataText = safeLower(JSON.stringify(ev?.metadata || {}))
+        return safeLower(label).includes(q) || userStr.includes(q) || metadataText.includes(q)
       })
   }, [events, query, typeFilter])
+
 
   const totalCount = filtered.length
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
@@ -253,8 +270,12 @@ export default function ActivityLogs() {
                     'Workspace user'
 
                   return (
-                    <tr key={`${ev.id ?? ev.created_at ?? ev.metric_type}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <tr
+                      key={`${ev.id ?? ev.created_at ?? ev.metric_type}-${idx}`}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                    >
                       <td className="px-4 py-3">
+
                         <div className="flex items-center gap-3">
                           <Badge variant={badgeVariant} size="sm">
                             {def.label || ev.metric_type}

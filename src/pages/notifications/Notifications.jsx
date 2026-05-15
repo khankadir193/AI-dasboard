@@ -22,13 +22,14 @@ const EVENT_DEFS = {
   },
   dashboard_view: {
     label: 'Dashboard activity alert',
-    badgeVariant: 'outline'
+    badgeVariant: 'slate'
   },
   active_users: {
     label: 'User login',
-    badgeVariant: 'secondary'
+    badgeVariant: 'purple'
   }
 }
+
 
 const DEFAULT_FILTER = 'all'
 
@@ -49,9 +50,14 @@ function formatDateTime(value) {
   })
 }
 
-function getNotificationId(ev, idx) {
-  return `${ev.id ?? ev.created_at ?? ev.metric_type}-${ev.metric_date ?? ''}-${idx}`
+function getNotificationId(ev) {
+  // Stable id across filtering/search/pagination.
+  const stableKey = ev?.id || ev?.created_at || ev?.metric_date || ''
+  const eventType = ev?.metric_type || ev?.metric_key || ''
+  const user = ev?.metadata?.email || ev?.metadata?.user || ev?.metadata?.username || ev?.metadata?.displayName || ''
+  return `${stableKey}-${eventType}-${user}`
 }
+
 
 export default function Notifications() {
   const { user } = useSelector((state) => state.auth)
@@ -133,15 +139,20 @@ export default function Notifications() {
   const filtered = useMemo(() => {
     const q = safeLower(query).trim()
 
+    const getEventType = (ev) => {
+      return ev?.metric_type || ev?.metric_key || ev?.type || ''
+    }
+
     return (events || [])
       .filter((ev) => {
         if (typeFilter === DEFAULT_FILTER) return true
-        return ev.metric_type === typeFilter
+        return getEventType(ev) === typeFilter
       })
-      .filter((ev, idx) => {
+      .filter((ev) => {
         if (!q) return true
-        const def = EVENT_DEFS[ev.metric_type]
-        const label = def?.label || ev.metric_type
+        const eventType = getEventType(ev)
+        const def = EVENT_DEFS[eventType]
+        const label = def?.label || eventType
         const userStr = safeLower(
           ev?.metadata?.email ||
             ev?.metadata?.user ||
@@ -150,9 +161,17 @@ export default function Notifications() {
             ''
         )
         const createdAt = formatDateTime(ev.created_at || ev.metric_date)
-        return safeLower(label).includes(q) || userStr.includes(q) || safeLower(createdAt).includes(q)
+        const metadataText = safeLower(JSON.stringify(ev?.metadata || {}))
+
+        return (
+          safeLower(label).includes(q) ||
+          userStr.includes(q) ||
+          safeLower(createdAt).includes(q) ||
+          metadataText.includes(q)
+        )
       })
   }, [events, query, typeFilter])
+
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
 
@@ -182,11 +201,12 @@ export default function Notifications() {
     const allowed = events || []
     let count = 0
     for (let i = 0; i < allowed.length; i++) {
-      const id = getNotificationId(allowed[i], i)
+      const id = getNotificationId(allowed[i])
       if (!readIds.has(id)) count += 1
     }
     return count
   }, [events, readIds])
+
 
   return (
     <div className="space-y-6">
@@ -270,8 +290,9 @@ export default function Notifications() {
                 ev?.metadata?.displayName ||
                 'Workspace user'
 
-              const notificationId = getNotificationId(ev, idx + (page - 1) * pageSize)
+              const notificationId = getNotificationId(ev)
               const isRead = readIds.has(notificationId)
+
 
               return (
                 <button
@@ -279,8 +300,9 @@ export default function Notifications() {
                   type="button"
                   onClick={() => markAsRead(notificationId)}
                   className={
-                    'w-full text-left px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors flex items-start gap-3'
+                    'w-full text-left px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors flex items-start gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 rounded-none'
                   }
+
                 >
                   <div className="pt-1">
                     {isRead ? (
@@ -300,7 +322,8 @@ export default function Notifications() {
                       )}
                     </div>
 
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700 dark:text-gray-200 break-words">
+
                       <span className="inline-flex items-center gap-1">
                         <User size={14} className="text-gray-400 dark:text-gray-500" />
                         {userName}
