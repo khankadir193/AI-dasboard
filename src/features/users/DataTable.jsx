@@ -10,6 +10,9 @@ import {
   resendInvite
 } from '../../services/invitesService'
 
+import { supabase } from '../../lib/supabaseClient'
+
+
 
 // Import custom hooks
 import {
@@ -214,6 +217,19 @@ export default function DataTable() {
         companyId
       })
 
+      // Send email via Edge Function (production-safe: server validates invite)
+      if (!pendingRow?.id) {
+        throw new Error('Invite id missing after creation')
+      }
+
+      const { error: edgeErr } = await supabase.functions.invoke('send-invite-email', {
+        body: { inviteId: pendingRow.id }
+      })
+
+      if (edgeErr) {
+        throw new Error(edgeErr.message || 'Failed to send invite email')
+      }
+
       // Render pending invite immediately
       setPendingInvites(prev => [pendingRow, ...prev])
 
@@ -222,6 +238,7 @@ export default function DataTable() {
       setInviteRole('Analyst')
       setInviteMessage("You've been invited to join the InsightAI workspace.")
       setInviteOpen(false)
+
     } catch (err) {
       showToast(err?.message || 'Failed to send invitation')
     } finally {
