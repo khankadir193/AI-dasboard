@@ -71,6 +71,28 @@ export default function DataTable() {
   const [isSending, setIsSending] = useState(false)
 
   const [pendingInvites, setPendingInvites] = useState([])
+  const [isInvitesLoading, setIsInvitesLoading] = useState(false)
+
+  useEffect(() => {
+    refreshPendingInvites()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId])
+
+  const refreshPendingInvites = async () => {
+    if (!companyId) return
+
+    setIsInvitesLoading(true)
+    try {
+      const rows = await getPendingInvitesForCompany(companyId)
+      setPendingInvites(rows)
+    } catch (err) {
+      // Keep UI resilient: don't block active users
+      console.error('Failed to fetch pending invites', err)
+    } finally {
+      setIsInvitesLoading(false)
+    }
+  }
+
 
   const [toast, setToast] = useState(null) // { id, message }
   const toastTimerRef = useRef(null)
@@ -226,8 +248,16 @@ export default function DataTable() {
             onExportPDF={handleExportPDF}
           />
           <button
-            onClick={() => setInviteOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            onClick={() => {
+              if (!canInvite) return
+              setInviteOpen(true)
+            }}
+            disabled={!canInvite}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+              canInvite
+                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 cursor-not-allowed'
+            }`}
           >
             <Plus size={16} />
             Invite Member
@@ -291,15 +321,29 @@ export default function DataTable() {
                     onEditRole={handleEditRole}
                     onToggleStatus={handleToggleStatus}
                     onDelete={handleDeleteUser}
-                    onResendInviteUI={(u) => {
+                    onResendInviteUI={async (u) => {
                       setActionMenuOpen(null)
-                      showToast('Resend invite requested')
+                      try {
+                        if (!u?.id) throw new Error('Invite id missing')
+                        await resendInvite({ inviteId: u.id })
+                        await refreshPendingInvites()
+                        showToast('Invitation resent')
+                      } catch (err) {
+                        showToast(err?.message || 'Failed to resend invite')
+                      }
                     }}
-                    onCancelPendingInviteUI={(u) => {
+                    onCancelPendingInviteUI={async (u) => {
                       setActionMenuOpen(null)
-                      setPendingInvites(prev => prev.filter(p => p.id !== u?.id))
-                      showToast('Invitation canceled')
+                      try {
+                        if (!u?.id) throw new Error('Invite id missing')
+                        await cancelInvite({ inviteId: u.id })
+                        await refreshPendingInvites()
+                        showToast('Invitation canceled')
+                      } catch (err) {
+                        showToast(err?.message || 'Failed to cancel invite')
+                      }
                     }}
+
                     onCopyInviteLinkUI={(u) => {
                       setActionMenuOpen(null)
                       showToast('Copy link is not configured')
@@ -442,7 +486,8 @@ export default function DataTable() {
               <div className="flex items-center gap-2 pt-1">
                 <Badge variant="warning" size="sm">Pending</Badge>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  This UI adds a pending member row locally only.
+                  Pending invites are managed via Supabase (no email sending yet).
+
                 </span>
               </div>
             </form>
