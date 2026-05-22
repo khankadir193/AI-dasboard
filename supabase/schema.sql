@@ -94,6 +94,9 @@ ALTER TABLE kpis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_insights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE data_tables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+-- Invites / membership onboarding tables (required for invite acceptance)
+-- Note: these tables must already exist in the database. We only add RLS policies here.
+
 
 -- RLS Policies for Companies table
 CREATE POLICY "Companies are viewable by authenticated users" ON companies
@@ -254,7 +257,22 @@ CREATE POLICY "Company admins can update company projects" ON projects
         )
     );
 
+-- RLS Policies for Company Members (company_members)
+-- Minimal safe rules for invite onboarding:
+-- 1) Select: user can read only their own membership rows
+-- 2) Insert: user can insert only their own membership row
+-- Assumes company_members columns include: user_id (UUID/text compatible with auth.uid())
+-- and auth.uid() matches user_id type.
+CREATE POLICY "Users can view their own company memberships" ON company_members
+    FOR SELECT
+    USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their own company membership" ON company_members
+    FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
 -- Create indexes for better performance
+
 CREATE INDEX IF NOT EXISTS idx_profiles_company_id ON profiles(company_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_data_company_id ON analytics_data(company_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_data_metric_type ON analytics_data(metric_type);

@@ -14,6 +14,8 @@ import AuthProvider from '../providers/AuthProvider'
 import PrivateRoute from '../routes/PrivateRoute'
 import PublicOnlyRoute from '../routes/PublicOnlyRoute'
 import RootRedirect from '../routes/RootRedirect'
+import AcceptInvitePage from '../pages/invites/AcceptInvitePage.jsx'
+
 
 /**
  * App.jsx - Clean routing only
@@ -42,6 +44,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
 
         </Route>
+        <Route path="/invite/:token" element={<AcceptInvitePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AuthProvider>
