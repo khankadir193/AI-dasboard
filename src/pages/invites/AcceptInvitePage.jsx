@@ -19,6 +19,26 @@ const isInviteExpired = (expiresAt) => {
   return Number.isNaN(d.getTime()) ? false : d.getTime() < Date.now()
 }
 
+const SESSION_POLL_INTERVAL_MS = 300
+const SESSION_MAX_WAIT_MS = 6000
+
+/** Poll until an authenticated session with a user exists (required for RLS writes). */
+async function waitForAuthenticatedSession() {
+  const deadline = Date.now() + SESSION_MAX_WAIT_MS
+  while (Date.now() < deadline) {
+    const { data: sessionData, error } = await supabase.auth.getSession()
+    const authUser = sessionData?.session?.user
+    if (authUser?.id) {
+      return { sessionData, authUser }
+    }
+    if (error) {
+      console.warn('[AcceptInvite] getSession error:', error)
+    }
+    await new Promise((resolve) => setTimeout(resolve, SESSION_POLL_INTERVAL_MS))
+  }
+  return null
+}
+
 export default function AcceptInvitePage() {
   const { token } = useParams()
   const navigate = useNavigate()
@@ -133,7 +153,22 @@ export default function AcceptInvitePage() {
 
       const role = normalizeInvitedRole(invite?.role || 'viewer')
 
-      // 1) Create auth user ONLY (no company/workspace creation here)
+      // Re-validate invite is still pending before any writes
+      const { data: freshInvite, error: freshErr } = await supabase
+        .from('invites')
+        .select('id, status, expires_at')
+        .eq('id', invite.id)
+        .maybeSingle()
+
+      if (freshErr) throw new Error(freshErr.message || 'Failed to validate invitation.')
+      if (!freshInvite || freshInvite.status !== 'pending') {
+        throw new Error('This invitation is no longer available (already accepted or invalid).')
+      }
+      if (isInviteExpired(freshInvite.expires_at)) {
+        throw new Error('This invitation link has expired.')
+      }
+
+      // 1) Create auth user ONLY (no company/workspace creation)
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: invitedEmail,
         password
@@ -143,31 +178,80 @@ export default function AcceptInvitePage() {
         throw new Error(signUpErr.message || 'Failed to create account.')
       }
 
-      // Supabase returns user in data.user
-      const userId = signUpData?.user?.id
-      if (!userId) throw new Error('User id missing after account creation.')
+      // 2) Wait until authenticated session exists (auth.uid() must match insert user_id)
+      let sessionData
+      let authUser
 
-      // Ensure an authenticated session exists before writing RLS-protected tables.
-      // Depending on Supabase auth settings (email confirmation, etc.) session may not be immediate.
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData?.session?.access_token
-      if (!accessToken) {
-        throw new Error(
-          'Authentication not ready yet. If email confirmation is enabled, confirm your email or sign in again, then try accepting the invite.'
-        )
+      if (signUpData?.session?.user?.id) {
+        sessionData = { session: signUpData.session }
+        authUser = signUpData.session.user
+      } else {
+        const sessionResult = await waitForAuthenticatedSession()
+        if (!sessionResult) {
+          throw new Error(
+            'Authentication session was not ready in time. If email confirmation is enabled, confirm your email, then sign in and ask your admin to resend the invite.'
+          )
+        }
+        sessionData = sessionResult.sessionData
+        authUser = sessionResult.authUser
       }
 
+      if (!authUser?.id) {
+        throw new Error('Authenticated user missing after account creation.')
+      }
 
-      // 2) Prevent duplicate invitation usage + set accepted fields atomically (best-effort)
+      const payload = {
+        company_id: invite.company_id,
+        user_id: authUser.id,
+        email: invitedEmail,
+        role,
+        status: 'active',
+        invited_by: invite?.created_by || invite?.invited_by || null
+      }
+
+      console.log('SESSION:', sessionData)
+      console.log('AUTH USER:', authUser)
+      console.log('AUTH UID:', authUser?.id)
+      console.log('PAYLOAD USER ID:', payload.user_id)
+      console.log('COMPANY ID:', invite.company_id)
+
+      // 3) Insert company_members first (RLS: auth.uid() = user_id)
+      const { error: memberErr } = await supabase.from('company_members').insert(payload)
+
+      if (memberErr) {
+        console.error('[AcceptInvite] company_members insert failed:', memberErr)
+        console.error('[AcceptInvite] session user id:', authUser?.id)
+        console.error('[AcceptInvite] payload user_id:', payload.user_id)
+        if (memberErr.code !== '23505') {
+          const hint =
+            authUser?.id !== payload.user_id
+              ? ' Session user id does not match payload user_id (auth.uid mismatch).'
+              : ''
+          throw new Error((memberErr.message || 'Failed to add member to company.') + hint)
+        }
+        console.warn('[AcceptInvite] Membership already exists, continuing.')
+      }
+
+      // 4) Upsert profile to join EXISTING company (no new company)
+      const { error: profileUpsertErr } = await supabase.from('profiles').upsert({
+        id: authUser.id,
+        company_id: invite.company_id,
+        role
+      })
+
+      if (profileUpsertErr) {
+        console.error('[AcceptInvite] profiles upsert failed:', profileUpsertErr)
+        throw new Error(profileUpsertErr.message || 'Failed to attach user to the invited company.')
+      }
+
+      // 5) Mark invite accepted ONLY after membership + profile succeed
       const nowIso = new Date().toISOString()
       const { data: updatedInvite, error: updateErr } = await supabase
         .from('invites')
         .update({
           status: 'accepted',
           accepted_at: nowIso,
-          accepted_by: userId,
-          company_id: invite.company_id,
-          role: role
+          accepted_by: authUser.id
         })
         .eq('id', invite.id)
         .eq('status', 'pending')
@@ -179,36 +263,13 @@ export default function AcceptInvitePage() {
         throw new Error('This invitation is no longer available (already accepted or invalid).')
       }
 
-      // 3) Ensure profile points to the EXISTING company and invited role
-      // This prevents any trigger/default logic from leaving the user attached to a newly created company.
-      const { error: profileUpsertErr } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userId,
-          company_id: invite.company_id,
-          role
-        })
+      // 6) Clear temporary signup session; user signs in cleanly afterward
+      await supabase.auth.signOut()
 
-      if (profileUpsertErr) {
-        throw new Error(profileUpsertErr.message || 'Failed to attach user to the invited company.')
-      }
-
-      // 4) Insert membership record into existing company_members (NO workspace_members)
-      const { error: memberErr } = await supabase
-        .from('company_members')
-        .insert({
-          company_id: invite.company_id,
-          user_id: userId,
-          email: invitedEmail,
-          role,
-          status: 'active',
-          invited_by: invite?.created_by || invite?.invited_by || null
-        })
-
-      if (memberErr) throw new Error(memberErr.message || 'Failed to add member to company.')
-
-
-      navigate('/dashboard', { replace: true })
+      navigate('/signin', {
+        replace: true,
+        state: { message: 'Invitation accepted successfully. Please sign in.' }
+      })
     } catch (e) {
       setError(e?.message || 'Failed to accept invitation.')
     } finally {

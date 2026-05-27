@@ -1,14 +1,23 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 
 export default function SignIn() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    const message = location.state?.message
+    if (message) {
+      setInfo(message)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.pathname, location.state, navigate])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
