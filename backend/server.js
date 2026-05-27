@@ -6,9 +6,9 @@ import { registerHealthRoutes } from './routes/health.js';
 
 // Load environment variables from .env file
 const result = dotenv.config();
-console.log('DOTENV RESULT:', result);
-console.log('CURRENT DIR:', process.cwd());
-console.log('GROQ KEY:', process.env.GROQ_API_KEY);
+// console.log('DOTENV RESULT:', result);
+// console.log('CURRENT DIR:', process.cwd());
+// console.log('GROQ KEY:', process.env.GROQ_API_KEY);
 // Validate required environment variables
 if (!process.env.GROQ_API_KEY) {
   console.error('ERROR: GROQ_API_KEY environment variable is required');
