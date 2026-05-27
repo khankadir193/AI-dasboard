@@ -94,6 +94,11 @@ ALTER TABLE kpis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_insights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE data_tables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+-- company_members: RLS must be enabled so INSERT policies are enforced.
+-- Without this the policies are silently ignored and the authenticated
+-- role has no table-level grant, causing "permission denied".
+ALTER TABLE public.company_members ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT ON public.company_members TO authenticated;
 -- Invites / membership onboarding tables (required for invite acceptance)
 -- Note: these tables must already exist in the database. We only add RLS policies here.
 
@@ -260,15 +265,19 @@ CREATE POLICY "Company admins can update company projects" ON projects
 -- RLS Policies for Company Members (company_members)
 -- Minimal safe rules for invite onboarding:
 -- 1) Select: user can read only their own membership rows
--- 2) Insert: user can insert only their own membership row
--- Assumes company_members columns include: user_id (UUID/text compatible with auth.uid())
--- and auth.uid() matches user_id type.
-CREATE POLICY "Users can view their own company memberships" ON company_members
+-- 2) Insert: user can insert only their own membership row (auth.uid() = user_id)
+DROP POLICY IF EXISTS "Users can view their own company memberships"  ON public.company_members;
+DROP POLICY IF EXISTS "Users can insert their own company membership" ON public.company_members;
+DROP POLICY IF EXISTS "Authenticated users can insert own membership" ON public.company_members;
+
+CREATE POLICY "company_members_select_own" ON public.company_members
     FOR SELECT
+    TO authenticated
     USING (user_id = auth.uid());
 
-CREATE POLICY "Users can insert their own company membership" ON company_members
+CREATE POLICY "company_members_insert_own" ON public.company_members
     FOR INSERT
+    TO authenticated
     WITH CHECK (user_id = auth.uid());
 
 -- Create indexes for better performance
@@ -315,28 +324,38 @@ CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
 -- Automatically creates company and profile when user signs up
 -- =====================================================
 
--- Function to handle new user signup
+-- Function to handle new user signup.
+-- Skips auto-provisioning for invite signups (skip_provisioning = 'true' in metadata)
+-- so the invite acceptance flow can write the correct company_id without being overwritten.
+-- Normal signups (no metadata flag) continue to receive auto-provisioned company + admin profile.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
   company_uuid UUID;
   company_name TEXT;
 BEGIN
-  -- Get company_name from user metadata, or use email prefix
+  -- Skip for invite signups or if profile already exists.
+  IF (NEW.raw_user_meta_data->>'skip_provisioning') = 'true'
+     OR (NEW.raw_user_meta_data->>'invited') = 'true' THEN
+    RETURN NEW;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE id = NEW.id) THEN
+    RETURN NEW;
+  END IF;
+
   company_name := COALESCE(
     NEW.raw_user_meta_data->>'company_name',
     SPLIT_PART(NEW.email, '@', 1) || ' Company'
   );
-  
-  -- Create company
-  INSERT INTO companies (name)
+
+  INSERT INTO public.companies (name)
   VALUES (company_name)
   RETURNING id INTO company_uuid;
-  
-  -- Create profile linked to company
-  INSERT INTO profiles (id, company_id, role, email)
+
+  INSERT INTO public.profiles (id, company_id, role, email)
   VALUES (NEW.id, company_uuid, 'admin', NEW.email);
-  
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -19,6 +19,14 @@ const isInviteExpired = (expiresAt) => {
   return Number.isNaN(d.getTime()) ? false : d.getTime() < Date.now()
 }
 
+const getInviteAvailabilityError = (row) => {
+  if (!row) return 'Invalid invite link.'
+  if (isInviteExpired(row?.expires_at)) return 'This invitation link has expired.'
+  if (row?.status === 'accepted') return 'This invitation has already been accepted.'
+  if (row?.status !== 'pending') return 'This invitation is not valid anymore.'
+  return ''
+}
+
 const SESSION_POLL_INTERVAL_MS = 300
 const SESSION_MAX_WAIT_MS = 6000
 
@@ -79,23 +87,9 @@ export default function AcceptInvitePage() {
           .maybeSingle()
 
         if (invErr) throw new Error(invErr.message || 'Failed to fetch invite.')
-        if (!inv) {
-          if (!cancelled) setError('Invalid invite link.')
-          return
-        }
-
-        // Validate invite status
-        const status = inv?.status
-        if (status !== 'pending') {
-          if (!cancelled) {
-            setError(status === 'accepted' ? 'This invitation has already been accepted.' : 'This invitation is not valid anymore.')
-          }
-          return
-        }
-
-        // Validate expiry
-        if (isInviteExpired(inv?.expires_at)) {
-          if (!cancelled) setError('This invitation link has expired.')
+        const availabilityError = getInviteAvailabilityError(inv)
+        if (availabilityError) {
+          if (!cancelled) setError(availabilityError)
           return
         }
 
@@ -161,17 +155,21 @@ export default function AcceptInvitePage() {
         .maybeSingle()
 
       if (freshErr) throw new Error(freshErr.message || 'Failed to validate invitation.')
-      if (!freshInvite || freshInvite.status !== 'pending') {
-        throw new Error('This invitation is no longer available (already accepted or invalid).')
-      }
-      if (isInviteExpired(freshInvite.expires_at)) {
-        throw new Error('This invitation link has expired.')
+      const availabilityError = getInviteAvailabilityError(freshInvite)
+      if (availabilityError) {
+        throw new Error(availabilityError)
       }
 
-      // 1) Create auth user ONLY (no company/workspace creation)
+      // 1) Create auth user ONLY (no company/workspace creation).
+      // skip_provisioning tells the handle_new_user() DB trigger to skip
+      // auto-creating a company+profile so we can write the correct
+      // invited company_id ourselves in the steps below.
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email: invitedEmail,
-        password
+        password,
+        options: {
+          data: { skip_provisioning: 'true', invited: true }
+        }
       })
 
       if (signUpErr) {
@@ -216,7 +214,23 @@ export default function AcceptInvitePage() {
       console.log('COMPANY ID:', invite.company_id)
 
       // 3) Insert company_members first (RLS: auth.uid() = user_id)
-      const { error: memberErr } = await supabase.from('company_members').insert(payload)
+      // Duplicate-safe: if row already exists, skip insert.
+      const { data: existingMembership, error: existingMembershipErr } = await supabase
+        .from('company_members')
+        .select('company_id, user_id')
+        .eq('company_id', payload.company_id)
+        .eq('user_id', payload.user_id)
+        .maybeSingle()
+
+      if (existingMembershipErr) {
+        throw new Error(existingMembershipErr.message || 'Failed to validate existing membership.')
+      }
+
+      let memberErr = null
+      if (!existingMembership) {
+        const memberInsertResult = await supabase.from('company_members').insert(payload)
+        memberErr = memberInsertResult.error
+      }
 
       if (memberErr) {
         console.error('[AcceptInvite] company_members insert failed:', memberErr)
