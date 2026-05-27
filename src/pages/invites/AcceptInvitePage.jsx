@@ -47,6 +47,11 @@ async function waitForAuthenticatedSession() {
   return null
 }
 
+const isAlreadyRegisteredError = (message) => {
+  const normalized = String(message || '').toLowerCase()
+  return normalized.includes('already registered') || normalized.includes('user already exists')
+}
+
 export default function AcceptInvitePage() {
   const { token } = useParams()
   const navigate = useNavigate()
@@ -168,30 +173,30 @@ export default function AcceptInvitePage() {
         email: invitedEmail,
         password,
         options: {
-          data: { skip_provisioning: 'true', invited: true }
+          data: { skip_provisioning: true, invited: true }
         }
       })
 
       if (signUpErr) {
+        if (isAlreadyRegisteredError(signUpErr?.message)) {
+          throw new Error('An account for this email already exists. Please sign in to continue.')
+        }
         throw new Error(signUpErr.message || 'Failed to create account.')
       }
 
       // 2) Wait until authenticated session exists (auth.uid() must match insert user_id)
-      let sessionData
-      let authUser
+      // We always poll getSession() to avoid racing RLS writes right after signUp.
+      let sessionData = signUpData?.session ? { session: signUpData.session } : null
+      let authUser = signUpData?.session?.user || null
 
-      if (signUpData?.session?.user?.id) {
-        sessionData = { session: signUpData.session }
-        authUser = signUpData.session.user
-      } else {
-        const sessionResult = await waitForAuthenticatedSession()
-        if (!sessionResult) {
-          throw new Error(
-            'Authentication session was not ready in time. If email confirmation is enabled, confirm your email, then sign in and ask your admin to resend the invite.'
-          )
-        }
+      const sessionResult = await waitForAuthenticatedSession()
+      if (sessionResult) {
         sessionData = sessionResult.sessionData
         authUser = sessionResult.authUser
+      } else if (!authUser?.id) {
+        throw new Error(
+          'Authentication timed out while preparing your workspace access. Please sign in and try accepting the invite again.'
+        )
       }
 
       if (!authUser?.id) {
@@ -207,11 +212,8 @@ export default function AcceptInvitePage() {
         invited_by: invite?.created_by || invite?.invited_by || null
       }
 
-      console.log('SESSION:', sessionData)
-      console.log('AUTH USER:', authUser)
-      console.log('AUTH UID:', authUser?.id)
-      console.log('PAYLOAD USER ID:', payload.user_id)
-      console.log('COMPANY ID:', invite.company_id)
+      console.log('SESSION USER:', authUser?.id)
+      console.log('PAYLOAD USER:', payload.user_id)
 
       // 3) Insert company_members first (RLS: auth.uid() = user_id)
       // Duplicate-safe: if row already exists, skip insert.
