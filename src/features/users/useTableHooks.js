@@ -119,13 +119,14 @@ export const useClickOutside = (initialState = false) => {
  */
 export const useActionMenu = () => {
   const [actionMenuOpen, setActionMenuOpen] = useState(null)
-  const actionMenuRef = useRef(null)
 
   useEffect(() => {
-    const handleClickOutside = event => {
+    if (!actionMenuOpen) return
+
+    const handleClickOutside = (event) => {
       if (
-        actionMenuRef.current &&
-        !actionMenuRef.current.contains(event.target)
+        !event.target.closest('[data-team-actions-root]') &&
+        !event.target.closest('[data-team-action-menu]')
       ) {
         setActionMenuOpen(null)
       }
@@ -133,9 +134,9 @@ export const useActionMenu = () => {
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [actionMenuOpen])
 
-  return { actionMenuOpen, setActionMenuOpen, actionMenuRef }
+  return { actionMenuOpen, setActionMenuOpen }
 }
 
 /**

@@ -2,10 +2,10 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import {
   fetchAllUsers as fetchAllUsersService,
   updateUserRole as updateUserRoleService,
-  toggleUserStatus as toggleUserStatusService
+  updateMemberStatus as updateMemberStatusService,
+  removeMember as removeMemberService
 } from '../../services/usersService'
 
-// Async thunk for fetching ALL users with company data
 export const fetchAllUsers = createAsyncThunk(
   'users/fetchAllUsers',
   async (_, { rejectWithValue }) => {
@@ -17,24 +17,50 @@ export const fetchAllUsers = createAsyncThunk(
   }
 )
 
-// Async thunk for updating user role
 export const updateUserRole = createAsyncThunk(
   'users/updateUserRole',
-  async ({ userId, role }, { rejectWithValue }) => {
+  async ({ userId, role, companyId }, { rejectWithValue }) => {
     try {
-      return await updateUserRoleService({ userId, role })
+      return await updateUserRoleService({ userId, role, companyId })
     } catch (error) {
       return rejectWithValue(error.message)
     }
   }
 )
 
-// Async thunk for toggling user active status
+export const updateMemberStatus = createAsyncThunk(
+  'users/updateMemberStatus',
+  async ({ userId, status, companyId }, { rejectWithValue }) => {
+    try {
+      return await updateMemberStatusService({ userId, status, companyId })
+    } catch (error) {
+      return rejectWithValue(error.message)
+    }
+  }
+)
+
+export const removeMember = createAsyncThunk(
+  'users/removeMember',
+  async ({ userId, companyId }, { rejectWithValue }) => {
+    try {
+      await removeMemberService({ userId, companyId })
+      return { userId }
+    } catch (error) {
+      return rejectWithValue(error.message)
+    }
+  }
+)
+
+/** @deprecated */
 export const toggleUserStatus = createAsyncThunk(
   'users/toggleUserStatus',
-  async ({ userId, is_active }, { rejectWithValue }) => {
+  async ({ userId, is_active, companyId }, { rejectWithValue }) => {
     try {
-      return await toggleUserStatusService({ userId, is_active })
+      return await updateMemberStatusService({
+        userId,
+        status: is_active ? 'active' : 'inactive',
+        companyId
+      })
     } catch (error) {
       return rejectWithValue(error.message)
     }
@@ -44,7 +70,7 @@ export const toggleUserStatus = createAsyncThunk(
 const usersSlice = createSlice({
   name: 'users',
   initialState: {
-    users: [],           // All users array
+    users: [],
     isLoading: false,
     error: null,
     totalCount: 0
@@ -60,7 +86,6 @@ const usersSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch All Users
       .addCase(fetchAllUsers.pending, (state) => {
         state.isLoading = true
         state.error = null
@@ -75,22 +100,29 @@ const usersSlice = createSlice({
         state.isLoading = false
         state.error = action.payload
       })
-      
-      // Update User Role
       .addCase(updateUserRole.fulfilled, (state, action) => {
-        const updatedUser = action.payload
-        const index = state.users.findIndex(u => u.id === updatedUser.id)
+        const updated = action.payload
+        const index = state.users.findIndex((u) => u.id === updated.id)
         if (index !== -1) {
-          state.users[index] = { ...state.users[index], ...updatedUser }
+          state.users[index] = { ...state.users[index], ...updated }
         }
       })
-      
-      // Toggle User Status
-      .addCase(toggleUserStatus.fulfilled, (state, action) => {
-        const updatedUser = action.payload
-        const index = state.users.findIndex(u => u.id === updatedUser.id)
+      .addCase(updateMemberStatus.fulfilled, (state, action) => {
+        const updated = action.payload
+        const index = state.users.findIndex((u) => u.id === updated.id)
         if (index !== -1) {
-          state.users[index] = { ...state.users[index], ...updatedUser }
+          state.users[index] = { ...state.users[index], ...updated }
+        }
+      })
+      .addCase(removeMember.fulfilled, (state, action) => {
+        state.users = state.users.filter((u) => u.id !== action.payload.userId)
+        state.totalCount = state.users.length
+      })
+      .addCase(toggleUserStatus.fulfilled, (state, action) => {
+        const updated = action.payload
+        const index = state.users.findIndex((u) => u.id === updated.id)
+        if (index !== -1) {
+          state.users[index] = { ...state.users[index], ...updated }
         }
       })
   }

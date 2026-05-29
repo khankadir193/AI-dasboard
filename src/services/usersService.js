@@ -1,36 +1,69 @@
 import { supabase } from '../lib/supabaseClient'
 
-/**
- * Fetch all users for the current user's company
- */
-export const fetchAllUsers = async () => {
-  // Determine tenant scope from currently logged-in user profile (company_id)
+const ALLOWED_ROLES = new Set(['admin', 'manager', 'analyst', 'viewer'])
+const ALLOWED_STATUSES = new Set(['active', 'inactive', 'removed'])
+
+const normalizeRole = (role) => {
+  const r = String(role || '').toLowerCase().trim()
+  return ALLOWED_ROLES.has(r) ? r : 'viewer'
+}
+
+async function getAuthContext() {
   const {
     data: { user: authUser },
     error: authUserError
   } = await supabase.auth.getUser()
 
-  if (authUserError) {
-    throw new Error(authUserError.message)
-  }
-
-  const authUid = authUser?.id
-  if (!authUid) {
-    return []
-  }
+  if (authUserError) throw new Error(authUserError.message)
+  if (!authUser?.id) return null
 
   const { data: myProfile, error: myProfileError } = await supabase
     .from('profiles')
-    .select('id, company_id')
-    .eq('id', authUid)
+    .select('id, company_id, role')
+    .eq('id', authUser.id)
     .maybeSingle()
 
   if (myProfileError) throw new Error(myProfileError.message || 'Failed to fetch profile')
-  if (!myProfile?.company_id) return []
+  if (!myProfile?.company_id) return null
 
-  const tenantCompanyId = myProfile.company_id
+  return { authUser, myProfile, companyId: myProfile.company_id }
+}
 
-  // Fetch profiles for ONLY the logged-in user's company, and join the company name
+export async function fetchMyMembership(userId, companyId) {
+  if (!userId || !companyId) return null
+
+  const { data, error } = await supabase
+    .from('company_members')
+    .select('id, company_id, user_id, role, status')
+    .eq('user_id', userId)
+    .eq('company_id', companyId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message || 'Failed to fetch membership')
+  return data
+}
+
+async function countActiveAdmins(companyId) {
+  const { count, error } = await supabase
+    .from('company_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+    .eq('role', 'admin')
+    .eq('status', 'active')
+
+  if (error) throw new Error(error.message || 'Failed to count admins')
+  return count ?? 0
+}
+
+/**
+ * Fetch all active team members for the current user's company
+ */
+export const fetchAllUsers = async () => {
+  const ctx = await getAuthContext()
+  if (!ctx) return []
+
+  const { companyId } = ctx
+
   const { data: profiles, error } = await supabase
     .from('profiles')
     .select(`
@@ -40,87 +73,228 @@ export const fetchAllUsers = async () => {
         name
       )
     `)
-    .eq('company_id', tenantCompanyId)
+    .eq('company_id', companyId)
 
-  if (error) {
-    throw new Error(error.message || 'Failed to fetch users')
-  }
+  if (error) throw new Error(error.message || 'Failed to fetch users')
 
-  const { data: members } = await supabase
+  const { data: members, error: membersError } = await supabase
     .from('company_members')
-    .select('user_id, email')
-    .eq('company_id', tenantCompanyId)
+    .select('id, user_id, email, role, status, invited_by, joined_at, created_at')
+    .eq('company_id', companyId)
+    .neq('status', 'removed')
 
-  const memberEmailByUserId = Object.fromEntries(
-    (members || [])
-      .filter((m) => m?.user_id && m?.email)
-      .map((m) => [m.user_id, m.email])
-  )
+  if (membersError) throw new Error(membersError.message || 'Failed to fetch company members')
 
-  const users = (profiles || []).map((profile) => {
-    const email = profile?.email || memberEmailByUserId[profile.id] || ''
+  const memberByUserId = Object.fromEntries((members || []).map((m) => [m.user_id, m]))
 
-    // Prefer first_name/last_name when present; fallback to email prefix
-    const first = (profile?.first_name || '').trim()
-    const last = (profile?.last_name || '').trim()
-    const fullName = [first, last].filter(Boolean).join(' ').trim()
+  const users = (profiles || [])
+    .filter((profile) => {
+      const member = memberByUserId[profile.id]
+      return !member || member.status !== 'removed'
+    })
+    .map((profile) => {
+      const member = memberByUserId[profile.id]
+      const email = profile?.email || member?.email || ''
 
-    const emailPrefix = email.split('@')[0] || 'user'
-    const fallbackName = emailPrefix
-      .replace(/[._-]/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase())
+      const first = (profile?.first_name || '').trim()
+      const last = (profile?.last_name || '').trim()
+      const fullName = [first, last].filter(Boolean).join(' ').trim()
 
-    const displayName = fullName || fallbackName || 'Unknown'
+      const emailPrefix = email.split('@')[0] || 'user'
+      const fallbackName = emailPrefix
+        .replace(/[._-]/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase())
 
-    // Handle company data shape - Supabase join may return object or array depending on relation
-    const companyData = profile?.companies
-    const companyObj = Array.isArray(companyData) ? companyData[0] : companyData
-    const companyName = companyObj?.name ?? null
+      const displayName = fullName || fallbackName || 'Unknown'
 
-    return {
-      id: profile.id,
-      email,
-      role: profile.role || 'viewer',
-      is_active: profile.is_active !== false,
-      created_at: profile.created_at,
-      company_id: profile.company_id,
-      permissions: profile.permissions,
-      avatar_url: profile.avatar_url,
-      updated_at: profile.updated_at,
-      displayName,
-      company: { name: companyName }
-    }
-  })
+      const companyData = profile?.companies
+      const companyObj = Array.isArray(companyData) ? companyData[0] : companyData
+      const companyName = companyObj?.name ?? null
+
+      const membershipStatus = member?.status || (profile.is_active !== false ? 'active' : 'inactive')
+      const role = member?.role || profile.role || 'viewer'
+
+      return {
+        id: profile.id,
+        memberId: member?.id || null,
+        email,
+        role,
+        membership_status: membershipStatus,
+        is_active: membershipStatus === 'active',
+        created_at: member?.joined_at || member?.created_at || profile.created_at,
+        company_id: profile.company_id,
+        permissions: profile.permissions,
+        avatar_url: profile.avatar_url,
+        updated_at: profile.updated_at,
+        invited_by: member?.invited_by || null,
+        displayName,
+        company: { name: companyName }
+      }
+    })
 
   return users
 }
 
-/**
- * Update user role
- */
-export const updateUserRole = async ({ userId, role }) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ role })
-    .eq('id', userId)
-    .select()
-    .maybeSingle()
+async function syncProfileRole(userId, role) {
+  const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
+  if (error) throw new Error(error.message || 'Failed to sync profile role')
+}
 
-  if (error) throw new Error(error.message || 'Failed to update user role')
-  return data
+async function syncProfileActive(userId, isActive) {
+  const { error } = await supabase.from('profiles').update({ is_active: isActive }).eq('id', userId)
+  if (error) throw new Error(error.message || 'Failed to sync profile status')
 }
 
 /**
- * Toggle user status
+ * Update member role in company_members and profiles
  */
-export const toggleUserStatus = async ({ userId, is_active }) => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ is_active })
-    .eq('id', userId)
+export const updateUserRole = async ({ userId, role, companyId }) => {
+  console.log('[EditRole] service payload:', { userId, role, companyId })
+
+  const ctx = await getAuthContext()
+  if (!ctx) throw new Error('Not authenticated')
+
+  const normalizedRole = normalizeRole(role)
+  const targetCompanyId = companyId || ctx.companyId
+
+  const { data: member, error: memberFetchErr } = await supabase
+    .from('company_members')
+    .select('id, role, status')
+    .eq('company_id', targetCompanyId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (memberFetchErr) throw new Error(memberFetchErr.message || 'Failed to fetch member')
+  if (!member?.id) throw new Error('Member not found')
+  if (member.status === 'removed') throw new Error('Cannot edit a removed member')
+
+  if (member.role === 'admin' && normalizedRole !== 'admin') {
+    const adminCount = await countActiveAdmins(targetCompanyId)
+    if (adminCount <= 1) throw new Error('Cannot change role of the last active admin')
+  }
+
+  const { data: updatedMember, error: memberErr } = await supabase
+    .from('company_members')
+    .update({ role: normalizedRole })
+    .eq('id', member.id)
     .select()
     .maybeSingle()
 
-  if (error) throw new Error(error.message || 'Failed to toggle user status')
-  return data
+  if (memberErr) throw new Error(memberErr.message || 'Failed to update member role')
+
+  try {
+    await syncProfileRole(userId, normalizedRole)
+  } catch (profileErr) {
+    await supabase.from('company_members').update({ role: member.role }).eq('id', member.id)
+    throw profileErr
+  }
+
+  return { id: userId, role: normalizedRole, membership_status: member.status }
+}
+
+/**
+ * Suspend or activate a member
+ */
+export const updateMemberStatus = async ({ userId, status, companyId }) => {
+  console.log('[SuspendUser] service payload:', { userId, status, companyId })
+
+  const ctx = await getAuthContext()
+  if (!ctx) throw new Error('Not authenticated')
+
+  const nextStatus = String(status || '').toLowerCase()
+  if (!ALLOWED_STATUSES.has(nextStatus) || nextStatus === 'removed') {
+    throw new Error('Invalid status')
+  }
+
+  const targetCompanyId = companyId || ctx.companyId
+
+  const { data: member, error: memberFetchErr } = await supabase
+    .from('company_members')
+    .select('id, role, status')
+    .eq('company_id', targetCompanyId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (memberFetchErr) throw new Error(memberFetchErr.message || 'Failed to fetch member')
+  if (!member?.id) throw new Error('Member not found')
+  if (member.status === 'removed') throw new Error('Cannot update a removed member')
+
+  if (nextStatus !== 'active' && member.role === 'admin') {
+    const adminCount = await countActiveAdmins(targetCompanyId)
+    if (adminCount <= 1) throw new Error('Cannot suspend or deactivate the last active admin')
+  }
+
+  const previousStatus = member.status
+
+  const { error: memberErr } = await supabase
+    .from('company_members')
+    .update({ status: nextStatus })
+    .eq('id', member.id)
+
+  if (memberErr) throw new Error(memberErr.message || 'Failed to update member status')
+
+  try {
+    await syncProfileActive(userId, nextStatus === 'active')
+  } catch (profileErr) {
+    await supabase.from('company_members').update({ status: previousStatus }).eq('id', member.id)
+    throw profileErr
+  }
+
+  return {
+    id: userId,
+    membership_status: nextStatus,
+    is_active: nextStatus === 'active'
+  }
+}
+
+/**
+ * Soft-remove a member from the company
+ */
+export const removeMember = async ({ userId, companyId }) => {
+  console.log('[RemoveUser] service payload:', { userId, companyId })
+
+  const ctx = await getAuthContext()
+  if (!ctx) throw new Error('Not authenticated')
+
+  const targetCompanyId = companyId || ctx.companyId
+
+  const { data: member, error: memberFetchErr } = await supabase
+    .from('company_members')
+    .select('id, role, status')
+    .eq('company_id', targetCompanyId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (memberFetchErr) throw new Error(memberFetchErr.message || 'Failed to fetch member')
+  if (!member?.id) throw new Error('Member not found')
+
+  if (member.role === 'admin') {
+    const adminCount = await countActiveAdmins(targetCompanyId)
+    if (adminCount <= 1) throw new Error('Cannot remove the last active admin')
+  }
+
+  const { error: memberErr } = await supabase
+    .from('company_members')
+    .update({ status: 'removed' })
+    .eq('id', member.id)
+
+  if (memberErr) throw new Error(memberErr.message || 'Failed to remove member')
+
+  try {
+    await syncProfileActive(userId, false)
+  } catch (profileErr) {
+    await supabase.from('company_members').update({ status: member.status }).eq('id', member.id)
+    throw profileErr
+  }
+
+  return { id: userId, removed: true }
+}
+
+/** @deprecated Use updateMemberStatus */
+export const toggleUserStatus = async ({ userId, is_active, companyId }) => {
+  return updateMemberStatus({
+    userId,
+    status: is_active ? 'active' : 'inactive',
+    companyId
+  })
 }

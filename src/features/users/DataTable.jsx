@@ -2,7 +2,13 @@ import { Plus } from 'lucide-react'
 import { useMemo, useRef, useState, useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useUsers } from '../../hooks/useFetch'
-import { updateUserRole, toggleUserStatus } from '../../store/slices/usersSlice'
+import {
+  fetchAllUsers,
+  updateUserRole,
+  updateMemberStatus,
+  removeMember
+} from '../../store/slices/usersSlice'
+import { getEditableRolesForActor, canEditTargetMember } from '../../utils/teamPermissions'
 import {
   createInvite,
   getPendingInvitesForCompany,
@@ -53,10 +59,19 @@ export default function DataTable() {
   const { data: rawUsers, isLoading, error } = useUsers()
   const users = useMemo(() => formatUsers(rawUsers), [rawUsers])
   const profile = useSelector(state => state.profile.profile)
+  const currentUserId = useSelector(state => state.auth.user?.id)
   const currentRole = profile?.role
-  const canInvite = currentRole === 'admin' || currentRole === 'manager'
-  const isAdmin = currentRole === 'admin'
+  const currentRoleKey = String(currentRole || '').toLowerCase().trim()
+  const canInvite = currentRoleKey === 'admin' || currentRoleKey === 'manager'
+  const isAdmin = currentRoleKey === 'admin'
   const companyId = profile?.company_id
+
+  const [viewUser, setViewUser] = useState(null)
+  const [editUser, setEditUser] = useState(null)
+  const [editRoleValue, setEditRoleValue] = useState('viewer')
+  const [confirmSuspendUser, setConfirmSuspendUser] = useState(null)
+  const [confirmRemoveUser, setConfirmRemoveUser] = useState(null)
+  const [actionLoading, setActionLoading] = useState(false)
 
 
 
@@ -64,7 +79,7 @@ export default function DataTable() {
   // Use custom hooks for state management
   const filterState = useTableFilters()
   const sortState = useTableSort()
-  const { actionMenuOpen, setActionMenuOpen, actionMenuRef } = useActionMenu()
+  const { actionMenuOpen, setActionMenuOpen } = useActionMenu()
 
   // Invite Member (UI-only placeholder workflow)
   const [isInviteOpen, setInviteOpen] = useState(false)
@@ -163,30 +178,126 @@ export default function DataTable() {
     exportUsers('pdf', sortedUsers)
   }
 
-  // Action handlers
+  const refreshUsers = () => dispatch(fetchAllUsers())
+
   const handleViewUser = (user) => {
-    alert(
-      `View User: ${user.displayName}\nEmail: ${user.email}\nRole: ${user.role}\nStatus: ${user.status}`
-    )
+    setViewUser(user)
     setActionMenuOpen(null)
   }
 
-  const handleEditRole = (user) => {
-    const newRole = user.role === 'Admin' ? 'Viewer' : 'Admin'
-    dispatch(updateUserRole({ userId: user.id, role: newRole.toLowerCase() }))
-    setActionMenuOpen(null)
-  }
-
-  const handleToggleStatus = (user) => {
-    dispatch(toggleUserStatus({ userId: user.id, is_active: !user.isActive }))
-    setActionMenuOpen(null)
-  }
-
-  const handleDeleteUser = (user) => {
-    if (confirm(`Are you sure you want to delete ${user.displayName}?`)) {
+  const handleEditRoleOpen = (user) => {
+    if (!canEditTargetMember(currentRoleKey, user?.roleKey || user?.role)) {
+      showToast('You do not have permission to edit this member')
       setActionMenuOpen(null)
+      return
+    }
+    setEditUser(user)
+    setEditRoleValue(String(user?.roleKey || user?.role || 'viewer').toLowerCase())
+    setActionMenuOpen(null)
+  }
+
+  const handleSaveRole = async (e) => {
+    e?.preventDefault?.()
+    if (!editUser?.id || actionLoading) return
+
+    const payload = { userId: editUser.id, role: editRoleValue, companyId }
+    console.log('[EditRole] payload:', payload)
+
+    setActionLoading(true)
+    try {
+      await dispatch(updateUserRole(payload)).unwrap()
+      await refreshUsers()
+      showToast('Role updated successfully')
+      setEditUser(null)
+    } catch (err) {
+      showToast(typeof err === 'string' ? err : err?.message || 'Failed to update role')
+    } finally {
+      setActionLoading(false)
     }
   }
+
+  const handleToggleStatusOpen = (user) => {
+    if (user?.id === currentUserId) {
+      showToast('You cannot suspend your own account')
+      setActionMenuOpen(null)
+      return
+    }
+    if (!canEditTargetMember(currentRoleKey, user?.roleKey || user?.role)) {
+      showToast('You do not have permission to suspend this member')
+      setActionMenuOpen(null)
+      return
+    }
+    setConfirmSuspendUser(user)
+    setActionMenuOpen(null)
+  }
+
+  const handleConfirmSuspend = async () => {
+    if (!confirmSuspendUser?.id || actionLoading) return
+
+    console.log('[SuspendUser] member:', confirmSuspendUser)
+
+    const isInactive =
+      confirmSuspendUser?.status === 'Inactive' ||
+      confirmSuspendUser?.membership_status === 'inactive'
+    const nextStatus = isInactive ? 'active' : 'inactive'
+
+    setActionLoading(true)
+    try {
+      await dispatch(
+        updateMemberStatus({
+          userId: confirmSuspendUser.id,
+          status: nextStatus,
+          companyId
+        })
+      ).unwrap()
+      await refreshUsers()
+      showToast(isInactive ? 'User activated successfully' : 'User suspended successfully')
+      setConfirmSuspendUser(null)
+    } catch (err) {
+      showToast(typeof err === 'string' ? err : err?.message || 'Failed to update user status')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleDeleteUserOpen = (user) => {
+    if (user?.id === currentUserId) {
+      showToast('You cannot remove your own account')
+      setActionMenuOpen(null)
+      return
+    }
+    if (!canEditTargetMember(currentRoleKey, user?.roleKey || user?.role)) {
+      showToast('You do not have permission to remove this member')
+      setActionMenuOpen(null)
+      return
+    }
+    setConfirmRemoveUser(user)
+    setActionMenuOpen(null)
+  }
+
+  const handleConfirmRemove = async () => {
+    if (!confirmRemoveUser?.id || actionLoading) return
+
+    console.log('[RemoveUser] member:', confirmRemoveUser)
+
+    setActionLoading(true)
+    try {
+      await dispatch(
+        removeMember({ userId: confirmRemoveUser.id, companyId })
+      ).unwrap()
+      await refreshUsers()
+      showToast('User removed from workspace')
+      setConfirmRemoveUser(null)
+    } catch (err) {
+      showToast(typeof err === 'string' ? err : err?.message || 'Failed to remove user')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const editableRolesForModal = editUser
+    ? getEditableRolesForActor(currentRoleKey, editUser.roleKey || editUser.role)
+    : []
 
   const handleSendInvite = async (e) => {
     e?.preventDefault?.()
@@ -301,8 +412,8 @@ export default function DataTable() {
       />
 
       {/* Table Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto min-h-[420px] [scrollbar-width:thin]">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div className="overflow-x-auto overflow-y-visible min-h-[420px] [scrollbar-width:thin]">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
             <SortableTableHeader
               columns={TABLE_COLUMNS}
@@ -314,7 +425,7 @@ export default function DataTable() {
               }}
             />
 
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 [&_td]:overflow-visible">
               {isLoading ? (
                 <TableLoadingState />
               ) : error ? (
@@ -331,13 +442,14 @@ export default function DataTable() {
                   <UserTableRow
                     key={user?.id ?? user?.formattedId}
                     user={user}
+                    currentUserId={currentUserId}
+                    actorRole={currentRoleKey}
                     isActionMenuOpen={actionMenuOpen}
                     onActionMenuToggle={setActionMenuOpen}
-                    onActionMenuRef={actionMenuRef}
                     onView={handleViewUser}
-                    onEditRole={handleEditRole}
-                    onToggleStatus={handleToggleStatus}
-                    onDelete={handleDeleteUser}
+                    onEditRole={handleEditRoleOpen}
+                    onToggleStatus={handleToggleStatusOpen}
+                    onDelete={handleDeleteUserOpen}
                     onResendInviteUI={async (u) => {
                       setActionMenuOpen(null)
                       try {
@@ -509,6 +621,167 @@ export default function DataTable() {
               </div>
             </form>
           </div>
+        </Modal>
+
+        {/* View User Modal */}
+        <Modal
+          isOpen={!!viewUser}
+          onClose={() => setViewUser(null)}
+          title="User Details"
+        >
+          {viewUser && (
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Email</p>
+                <p className="text-gray-900 dark:text-white">{viewUser.email || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Role</p>
+                <p className="text-gray-900 dark:text-white">{viewUser.role || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Status</p>
+                <p className="text-gray-900 dark:text-white">{viewUser.status || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Joined</p>
+                <p className="text-gray-900 dark:text-white">{viewUser.joinedAt || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Company</p>
+                <p className="text-gray-900 dark:text-white">{viewUser.companyName || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Invited by</p>
+                <p className="text-gray-900 dark:text-white font-mono text-xs">
+                  {viewUser.invited_by || 'N/A'}
+                </p>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button type="button" variant="secondary" onClick={() => setViewUser(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Edit Role Modal */}
+        <Modal
+          isOpen={!!editUser}
+          onClose={() => !actionLoading && setEditUser(null)}
+          title="Edit Role"
+        >
+          {editUser && (
+            <form onSubmit={handleSaveRole} className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Update role for <span className="font-medium">{editUser.displayName}</span>
+              </p>
+              <select
+                value={editRoleValue}
+                onChange={(e) => setEditRoleValue(e.target.value)}
+                disabled={actionLoading}
+                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+              >
+                {editableRolesForModal.map((role) => (
+                  <option key={role} value={role}>
+                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={actionLoading}
+                  onClick={() => setEditUser(null)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" loading={actionLoading} disabled={actionLoading}>
+                  Save
+                </Button>
+              </div>
+            </form>
+          )}
+        </Modal>
+
+        {/* Suspend / Activate Confirmation */}
+        <Modal
+          isOpen={!!confirmSuspendUser}
+          onClose={() => !actionLoading && setConfirmSuspendUser(null)}
+          title={
+            confirmSuspendUser?.status === 'Inactive' ||
+            confirmSuspendUser?.membership_status === 'inactive'
+              ? 'Activate User'
+              : 'Suspend User'
+          }
+        >
+          {confirmSuspendUser && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                {confirmSuspendUser?.status === 'Inactive' ||
+                confirmSuspendUser?.membership_status === 'inactive'
+                  ? `Activate ${confirmSuspendUser.displayName}? They will regain dashboard access.`
+                  : `Are you sure you want to suspend ${confirmSuspendUser.displayName}? They will lose dashboard access.`}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={actionLoading}
+                  onClick={() => setConfirmSuspendUser(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  loading={actionLoading}
+                  disabled={actionLoading}
+                  onClick={handleConfirmSuspend}
+                >
+                  Confirm
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Remove User Confirmation */}
+        <Modal
+          isOpen={!!confirmRemoveUser}
+          onClose={() => !actionLoading && setConfirmRemoveUser(null)}
+          title="Remove User"
+        >
+          {confirmRemoveUser && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Remove <span className="font-medium">{confirmRemoveUser.displayName}</span> from this
+                workspace? This does not delete their auth account.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={actionLoading}
+                  onClick={() => setConfirmRemoveUser(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  loading={actionLoading}
+                  disabled={actionLoading}
+                  onClick={handleConfirmRemove}
+                  className="bg-red-600 hover:bg-red-700 focus:ring-red-500/30"
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          )}
         </Modal>
 
         {/* Minimal toast/snackbar */}

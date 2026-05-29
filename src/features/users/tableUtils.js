@@ -90,17 +90,28 @@ export const formatUsers = (rawUsers) => {
     const displayName = generateDisplayName(email, user?.displayName)
     const initials = generateInitials(displayName)
     const normalizedRole = normalizeRole(user?.role)
-    const isActive = user?.is_active !== false
-    const status = isActive ? 'Active' : 'Inactive'
+    const membershipStatus = String(user?.membership_status || '').toLowerCase()
+    const isActive = membershipStatus ? membershipStatus === 'active' : user?.is_active !== false
+    const status =
+      membershipStatus === 'inactive'
+        ? 'Inactive'
+        : membershipStatus === 'removed'
+          ? 'Removed'
+          : isActive
+            ? 'Active'
+            : 'Inactive'
     const joinedAt = formatDate(user?.created_at)
     const avatarGradient = getAvatarGradient(index)
     const companyName = user?.company?.name || 'No Company'
+
+    const roleKey = String(user?.role || 'viewer').toLowerCase()
 
     return {
       ...user,
       formattedId: `#USR-${String(1001 + index).padStart(4, '0')}`,
       displayName,
       initials,
+      roleKey,
       role: normalizedRole,
       roleClass: getRoleClass(user?.role),
       status,
