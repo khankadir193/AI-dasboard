@@ -252,7 +252,8 @@ export default function AcceptInvitePage() {
       const { error: profileUpsertErr } = await supabase.from('profiles').upsert({
         id: authUser.id,
         company_id: invite.company_id,
-        role
+        role,
+        email: invitedEmail
       })
 
       if (profileUpsertErr) {

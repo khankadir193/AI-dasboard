@@ -46,8 +46,19 @@ export const fetchAllUsers = async () => {
     throw new Error(error.message || 'Failed to fetch users')
   }
 
+  const { data: members } = await supabase
+    .from('company_members')
+    .select('user_id, email')
+    .eq('company_id', tenantCompanyId)
+
+  const memberEmailByUserId = Object.fromEntries(
+    (members || [])
+      .filter((m) => m?.user_id && m?.email)
+      .map((m) => [m.user_id, m.email])
+  )
+
   const users = (profiles || []).map((profile) => {
-    const email = profile?.email || ''
+    const email = profile?.email || memberEmailByUserId[profile.id] || ''
 
     // Prefer first_name/last_name when present; fallback to email prefix
     const first = (profile?.first_name || '').trim()
