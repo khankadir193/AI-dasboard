@@ -13,11 +13,16 @@ export default function SignIn() {
 
   useEffect(() => {
     const message = location.state?.message
+    const prefillEmail = location.state?.email
+    if (prefillEmail) {
+      setEmail(prefillEmail)
+    }
     if (message) {
       setInfo(message)
-      navigate(location.pathname, { replace: true, state: {} })
+      navigate(location.pathname + location.search, { replace: true, state: {} })
     }
-  }, [location.pathname, location.state, navigate])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -33,14 +38,21 @@ export default function SignIn() {
     setIsSubmitting(false)
 
     if (signInError) {
+      console.error('[SignIn] Signin failed:', signInError)
       setError(signInError.message)
       return
     }
 
     if (!data?.session) {
+      console.warn('[SignIn] Signin succeeded but no session')
       setInfo('Sign-in succeeded but no active session was created. Please try again.')
       return
     }
+
+    // Successful signin with session
+    console.log('[SignIn] Signin successful, redirecting to dashboard')
+    const redirect = location.state?.redirect || '/dashboard'
+    navigate(redirect, { replace: true })
   }
 
   return (

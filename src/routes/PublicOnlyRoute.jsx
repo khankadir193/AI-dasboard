@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import FullScreenLoader from '../components/common/FullScreenLoader'
 
@@ -10,13 +10,17 @@ import FullScreenLoader from '../components/common/FullScreenLoader'
  */
 export default function PublicOnlyRoute({ children }) {
   const { user, loading } = useSelector((state) => state.auth)
+  const location = useLocation()
 
   if (loading) {
     return <FullScreenLoader />
   }
 
-  // If user exists, redirect to dashboard
   if (user && user.id) {
+    const redirect = new URLSearchParams(location.search).get('redirect')
+    if (redirect && redirect.startsWith('/invite/')) {
+      return <Navigate to={redirect} replace />
+    }
     return <Navigate to="/dashboard" replace />
   }
 

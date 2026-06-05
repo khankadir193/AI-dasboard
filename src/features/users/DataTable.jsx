@@ -13,7 +13,10 @@ import {
   createInvite,
   getPendingInvitesForCompany,
   cancelInvite,
-  resendInvite
+  resendInvite,
+  sendInviteEmail,
+  buildInviteUrl,
+  getInviteToken
 } from '../../services/invitesService'
 
 import { supabase } from '../../lib/supabaseClient'
@@ -49,7 +52,6 @@ import { TableLoadingState, TableErrorState, TableEmptyState } from './component
 
 import Modal from '../../components/common/Modal'
 import Input from '../../components/ui/Input'
-import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
 
 const PENDING_STATUS = 'Pending'
@@ -62,9 +64,10 @@ export default function DataTable() {
   const currentUserId = useSelector(state => state.auth.user?.id)
   const currentRole = profile?.role
   const currentRoleKey = String(currentRole || '').toLowerCase().trim()
-  const canInvite = currentRoleKey === 'admin' || currentRoleKey === 'manager'
+  const canInvite = currentRoleKey === 'admin'
   const isAdmin = currentRoleKey === 'admin'
   const companyId = profile?.company_id
+
 
   const [viewUser, setViewUser] = useState(null)
   const [editUser, setEditUser] = useState(null)
@@ -322,6 +325,11 @@ export default function DataTable() {
     try {
       const dbRole = String(inviteRole || '').toLowerCase().trim()
 
+      if (currentRoleKey !== 'admin') {
+        showToast('You do not have permission to invite members')
+        return
+      }
+
       const pendingRow = await createInvite({
         email: inviteEmail.trim(),
         role: dbRole,
@@ -333,16 +341,35 @@ export default function DataTable() {
         throw new Error('Invite id missing after creation')
       }
 
-      const { error: edgeErr } = await supabase.functions.invoke('send-invite-email', {
-        body: { inviteId: pendingRow.id }
-      })
-
-      if (edgeErr) {
-        throw new Error(edgeErr.message || 'Failed to send invite email')
+      try {
+        await sendInviteEmail(pendingRow.id)
+      } catch (emailErr) {
+        await cancelInvite({ inviteId: pendingRow.id })
+        throw emailErr
       }
 
-      // Render pending invite immediately
-      setPendingInvites(prev => [pendingRow, ...prev])
+      // Render pending invite immediately + keep table in sync with server
+      // (prevents cases where pendingInvites state is overwritten by refreshes)
+      setPendingInvites(prev => {
+        // Deduplicate by email (company_members always wins)
+        const existingEmails = new Set(
+          (users || []).map(u => String(u?.email || '').toLowerCase().trim()).filter(Boolean)
+        )
+        const nextEmail = String(pendingRow?.email || '').toLowerCase().trim()
+
+        if (!nextEmail) return prev
+        if (existingEmails.has(nextEmail)) return prev
+
+        const withoutEmail = prev.filter(
+          p => String(p?.email || '').toLowerCase().trim() !== nextEmail
+        )
+        return [pendingRow, ...withoutEmail]
+      })
+
+      // Ensure pending list reflects the just-created row from invites table
+      await refreshPendingInvites()
+
+
 
       showToast('Invitation sent successfully')
       setInviteEmail('')
@@ -376,20 +403,27 @@ export default function DataTable() {
             onExportPDF={handleExportPDF}
           />
           <button
+            type="button"
             onClick={() => {
-              if (!canInvite) return
+              if (!canInvite) {
+                showToast('Only admins can invite members')
+                return
+              }
               setInviteOpen(true)
             }}
             disabled={!canInvite}
+            title={!canInvite ? 'Only admins can invite users' : undefined}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
               canInvite
                 ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 cursor-not-allowed'
+                : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
             }`}
+            aria-disabled={!canInvite}
           >
             <Plus size={16} />
             Invite Member
           </button>
+
         </div>
       </div>
 
@@ -473,9 +507,17 @@ export default function DataTable() {
                       }
                     }}
 
-                    onCopyInviteLinkUI={(u) => {
+                    onCopyInviteLinkUI={async (u) => {
                       setActionMenuOpen(null)
-                      showToast('Copy link is not configured')
+                      try {
+                        const token =
+                          u?.token || (await getInviteToken({ inviteId: u.id }))
+                        const link = buildInviteUrl(token)
+                        await navigator.clipboard.writeText(link)
+                        showToast('Invite link copied')
+                      } catch (err) {
+                        showToast(err?.message || 'Failed to copy invite link')
+                      }
                     }}
                   />
                 ))
@@ -537,7 +579,7 @@ export default function DataTable() {
                   disabled={isSending}
                   className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 >
-                  <option value="Admin">Admin</option>
+                  {isAdmin && <option value="Admin">Admin</option>}
                   <option value="Manager">Manager</option>
                   <option value="Analyst">Analyst</option>
                   <option value="Viewer">Viewer</option>
@@ -612,13 +654,9 @@ export default function DataTable() {
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <Badge variant="warning" size="sm">Pending</Badge>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Pending invites are managed via Supabase (no email sending yet).
-
-                </span>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 pt-1">
+                An email with an acceptance link will be sent. Invites expire after 7 days.
+              </p>
             </form>
           </div>
         </Modal>

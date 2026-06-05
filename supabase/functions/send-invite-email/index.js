@@ -56,13 +56,10 @@ Deno.serve(async (req) => {
 
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    console.log('SUPABASE URL--->>>>', supabaseUrl);
 
-
-
-    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY')
-
-    console.log('Using service role:', !!serviceRoleKey)
+    const serviceRoleKey =
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
+      Deno.env.get('SERVICE_ROLE_KEY')
 
     if (!supabaseUrl || !serviceRoleKey) {
 
