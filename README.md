@@ -1,160 +1,169 @@
-# InsightAI — AI-Powered SaaS Dashboard
+# InsightAI — AI-Powered SaaS Analytics Dashboard
 
-A production-grade analytics dashboard built with **React**, **JavaScript**, and modern frontend tooling. Features real-time data, AI-powered insights, interactive charts, and a fully responsive UI with dark mode.
+Production analytics dashboard + AI insights for teams.
 
-> 🚀 **Live Demo**: [your-vercel-link.vercel.app](#)
-> 📦 **GitHub**: [github.com/yourusername/ai-saas-dashboard](#)
+> 🚀 **Live Demo**: https://ai-dasboard.vercel.app/
+
+---
+
+## 🏁 Badges
+
+| Badge | Status |
+|---|---|
+| Build | CI badge placeholder |
+| License | TBD (see “License” section) |
+| Live Demo | https://ai-dasboard.vercel.app/ |
+| GitHub | GitHub placeholder |
+
+---
+
+## 📹 Screenshots / Demo
+
+<details>
+<summary>View placeholders</summary>
+
+| Dashboard | Analytics | AI Insights |
+|---|---|---|
+| Screenshot placeholder | Screenshot placeholder | Screenshot placeholder |
+
+</details>
 
 ---
 
 ## ✨ Features
 
-- **📊 Dashboard** — KPI cards, area charts, pie charts, and live REST API data
-- **📈 Analytics** — Multi-chart analytics with user growth and revenue vs expenses  
-- **🤖 AI Insights** — Chat interface powered by **secure backend proxy** → Groq AI
-- **🗃️ Data Table** — Sortable, filterable, paginated table with live API data
-- **🌙 Dark Mode** — Persistent dark/light theme toggle
-- **📱 Responsive** — Mobile-first design with collapsible sidebar
-- **⚡ Fast** — Built with Vite, React Query caching, and lazy loading
+| Area | What’s included (verified in code) |
+|---|---|
+| 📊 KPI Dashboard | `src/features/dashboard/Dashboard.jsx` renders trial banner, KPI section, and multiple charts + activity feed |
+| 📈 Analytics | `src/features/analytics/Analytics.jsx` renders recharts line chart + event distribution + summary cards |
+| 🤖 AI Insights Chat | `src/features/ai/AIInsights.jsx` chat UI using `src/lib/apiClient.js` (secure `/api/chat` proxy + mock fallback) |
+| 🗂️ Team Management | `src/features/users/DataTable.jsx` sortable/filterable/paginated table with member role/status actions + invite flow UI |
+| 🧩 Projects | `src/features/projects/Projects.jsx` projects list with filters, pagination, create/edit/delete (permission-gated) |
+| ⚙️ Workspace Settings | `src/features/organization/Settings.jsx` theme toggle, notification preferences (local), and locally-stored “OpenAI API Key” input |
+| 🔔 Activity Logs | `src/pages/activity-logs/ActivityLogs.jsx` search/filter + paginated activity events from `analytics_data` in Supabase |
+| 🔔 Notifications | `src/pages/notifications/Notifications.jsx` search/filter + paginated notifications from `analytics_data`, with read/unread persisted in `localStorage` |
+| 👥 Invitations & Accept Flow | `src/features/invitations/pages/AcceptInvitePage.jsx` + `PrivateRoute.jsx` reconciling from invite token |
+| 🔐 Auth (Supabase) | `src/features/auth/SignIn.jsx`, `src/features/auth/Signup.jsx`, route guards via `src/routes/PrivateRoute.jsx` and `src/routes/PublicOnlyRoute.jsx` |
+| 🌙 Persistent Theme | `src/context/ThemeContext.jsx` stores theme in `localStorage` + toggles `dark` class |
+| 📱 Responsive Layout | `src/components/layout/Layout.jsx` + `src/components/layout/Sidebar.jsx` collapsible sidebar + mobile overlay |
 
 ---
 
-## 🛠️ Tech Stack
+## 🏗️ Architecture
 
-| Technology | Purpose |
+<details>
+<summary>ASCII diagram (verified)</summary>
+
+```text
+Browser
+  |
+  |  POST /api/chat
+  v
+Vercel Serverless Function: api/chat.js
+  (server-side only, uses process.env.GROQ_API_KEY)
+  |
+  v
+Groq API
+```
+
+Local dev path (verified by Vite proxy + Express backend):
+
+```text
+Browser
+  |
+  |  POST /api/chat
+  v
+Vite dev server proxy (/api -> http://localhost:3001)
+  |
+  v
+Express dev server: backend/server.js
+  |
+  v
+backend/routes/chat.js
+  |
+  v
+Groq API
+```
+
+</details>
+
+---
+
+## 🧰 Tech Stack
+
+| Technology | Version (from `package.json`) |
 |---|---|
-| React 18 | UI framework |
-| React Router v6 | Client-side routing |
-| TanStack Query (React Query) | Data fetching & caching |
-| Recharts | Charts and data visualization |
-| Tailwind CSS | Utility-first styling |
-| Axios | HTTP client |
-| Lucide React | Icons |
-| **Vercel Serverless** | Secure backend API proxy |
-| **Groq AI** | Ultra-fast LLM inference |
-| Vite | Build tool |
+| React | ^18.2.0 |
+| React Router | ^6.22.0 |
+| TanStack Query | ^5.24.0 |
+| Recharts | ^2.12.0 |
+| Tailwind CSS | ^3.4.1 |
+| Axios | ^1.6.7 |
+| Lucide React | ^0.344.0 |
+| Vite | ^5.1.4 |
+| Express (backend dev) | ^5.2.1 |
+| Groq SDK | ^1.1.2 |
+| nodemon (backend dev) | ^3.1.14 |
+
+---
+
+## ✅ Prerequisites
+
+- Node.js (to run Vite + Express)
+- A Supabase project (authentication + `analytics_data` table used by Activity/Notifications)
+- Groq API key (server-side only)
+- Vercel account (for serverless deployment)
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Clone & Install
+### 1) Clone
 ```bash
-git clone https://github.com/yourusername/ai-saas-dashboard.git
-cd ai-saas-dashboard
+git clone <your-repo-url>
+cd <your-repo-folder>
+```
+
+### 2) Install
+```bash
 npm install
 ```
 
-### 2. Backend Setup (Serverless)
-API key **never** exposed to frontend:
-```
-# Backend (.env or Vercel dashboard)
-GROQ_API_KEY=your_groq_key_here
-```
+### 3) Environment setup
 
-### 3. Run Development Server (Local Fullstack)
+This repo’s `.gitignore` includes `.env`, but **`.env.example` is not present in this repository**. Create `.env` using the table below.
+
+### 4) Run (local fullstack)
 ```bash
-# Copy & set API key
-cp .env.example .env
-# Edit .env: GROQ_API_KEY=your_key
-
-# Start frontend + backend
 npm run dev
 ```
 
-Frontend: http://localhost:5173  
-Backend: http://localhost:3001/api/chat (proxied)
-
-**Scripts:**
-- `npm run dev:frontend` — Vite only (mocks)
-- `npm run dev:backend` — Backend server
-- `npm run dev` — Both concurrently
-
-### 4. Build for Production
-```bash
-npm run build
-npm run preview
-```
+- Frontend: http://localhost:5173
+- Backend (Express, for local `/api` proxy): http://localhost:3001
 
 ---
 
-## 📁 Project Structure
+## 🔐 Environment Variables
 
-```
-src/
-├── components/    # UI components
-├── pages/         # Route pages
-├── services/      # API services
-│   └── aiService.js  # Secure backend proxy
-backend/
-└── api/           # Vercel serverless functions
-    └── chat.js    # Groq AI proxy 🔒
-```
+> Source of truth: environment variable usage in the codebase (`process.env.GROQ_API_KEY`, `import.meta.env.VITE_*`).
 
----
+Create a local `.env` file (and configure these in Vercel for production):
 
-## 🔑 Key Implementation Highlights
-
-### Secure Serverless API Architecture
-**Implemented secure serverless API architecture using Vercel Functions to protect API keys and prevent client-side exposure.**
-
-```js
-// Frontend (safe)
-const data = await fetch('/api/chat', { method: 'POST', body: JSON.stringify({message}) })
-
-// Backend (secret key)
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-```
-
-### Custom Proxy Service
-```js
-// services/aiService.js  
-export async function getAIInsight(prompt) {
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    body: JSON.stringify({ message: systemPrompt + prompt })
-  })
-  return response.reply  // Backend hides Groq key
-}
-```
+| Name | Required | Where used | Description |
+|---|---:|---|---|
+| `GROQ_API_KEY` | Yes | `backend/server.js`, `backend/routes/chat.js`, `api/chat.js` | Groq API key used server-side by `/api/chat`. Never expose to the browser. |
+| `VITE_SUPABASE_URL` | Yes | `src/lib/supabaseClient.js`, `src/services/supabaseService.js` | Supabase project URL (client-side). |
+| `VITE_SUPABASE_ANON_KEY` | Yes | `src/lib/supabaseClient.js`, `src/services/supabaseService.js` | Supabase anon key (client-side). |
+| `VITE_API_URL` | Optional (has fallback) | `src/services/apiService.js` | Base URL for `apiService` (defaults to a Supabase URL if unset). |
+| `VITE_APP_NAME` | Optional | `src/utils/constants.js` | Used for display name fallback (default: `AI SaaS Dashboard`). |
+| `VITE_APP_VERSION` | Optional | `src/utils/constants.js` | Used for display version fallback (default: `1.0.0`). |
 
 ---
 
-## 🌐 Deployment (Vercel Recommended)
+## 📦 npm Scripts
 
-```bash
-npm i -g vercel
-vercel --prod
-```
+From `package.json`:
 
-**Vercel Dashboard** → Settings → Environment Variables:
-```
-GROQ_API_KEY = gsk_your_key_here
-```
-
-**Remove** any `VITE_GROQ_API_KEY` vars.
-
----
-
-## 🧪 Challenges Overcome
-
-See [CHALLENGES.md](./CHALLENGES.md)
-
-- Migrated from direct client-side AI calls to secure backend proxy
-- Graceful fallback to mocks during dev
-- Maintained identical UX while improving security
-
----
-
-## 📸 Screenshots
-
-| Dashboard | **Secure AI Insights** | Data Table |
-|---|---|---|
-| ![Dashboard](#) | ![AI](#) | ![Table](#) |
-
----
-
-## 📄 License
-
-MIT — perfect portfolio project.
+- `npm run dev` — `concurrently "npm run dev:frontend" "npm run dev:backend"`
+Groq API
 
