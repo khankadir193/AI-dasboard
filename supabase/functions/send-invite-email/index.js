@@ -1,5 +1,3 @@
-// import { Resend } from 'resend'
-import { Resend } from 'npm:resend'
 import { createClient } from 'npm:@supabase/supabase-js'
 
 // Simple, production-safe invite email sender.
@@ -76,11 +74,11 @@ Deno.serve(async (req) => {
     }
 
 
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
-    const fromEmail = Deno.env.get('INVITE_FROM_EMAIL') || Deno.env.get('RESEND_FROM_EMAIL')
-    if (!resendApiKey || !fromEmail) {
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY')
+    const fromEmail = Deno.env.get('INVITE_FROM_EMAIL')
+    if (!brevoApiKey || !fromEmail) {
       return new Response(
-        JSON.stringify({ ok: false, error: 'Server misconfigured (Resend env missing)' }),
+        JSON.stringify({ ok: false, error: 'Server misconfigured (Brevo env missing)' }),
         {
           status: 500,
           headers: {
@@ -250,6 +248,8 @@ Deno.serve(async (req) => {
 
     const inviteLink = `${String(appUrl).replace(/\/$/, '')}/invite/${encodeURIComponent(token)}`
 
+    console.log("[Invite] Creating invite email for:", email)
+
     const subject = `Invitation to join ${companyName}`
     const roleLabel =
       normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1)
@@ -265,16 +265,161 @@ Deno.serve(async (req) => {
       </div>
     `
 
-    const resend = new Resend(resendApiKey)
+    // Validate all required data before sending
+    if (!email || !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      console.error("[Invite] Invalid recipient email:", email)
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Invalid recipient email' }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
 
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: email,
-      subject,
-      html
-    })
+    if (!fromEmail || !fromEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      console.error("[Invite] Invalid sender email:", fromEmail)
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Server misconfigured (invalid sender email)' }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
 
-    return new Response(JSON.stringify({ ok: true, id: result?.id || null }), {
+    // Validate invite token exists and is not empty
+    if (!token || typeof token !== 'string' || token.trim().length === 0) {
+      console.error("[Invite] Invalid or missing invite token")
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Invalid invite token' }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
+
+    // Validate invite link is properly formed
+    if (!inviteLink.startsWith('http') || !inviteLink.includes('/invite/')) {
+      console.error("[Invite] Malformed invite link:", inviteLink)
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Malformed invite link' }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
+
+    console.log("[Invite] Sending email via Brevo to:", email)
+
+    // Extract recipient name from email, fallback to "Invited User"
+    const recipientName = (email?.split?.('@')?.[0] || '').trim() || 'Invited User'
+    const senderName = 'InsightAI'
+
+    // Build Brevo SMTP API payload (v3)
+    // https://developers.brevo.com/reference/sendtransacemail
+    const brevoPayload = {
+      sender: {
+        name: senderName,
+        email: fromEmail
+      },
+      to: [
+        {
+          email: email,
+          name: recipientName
+        }
+      ],
+      subject: subject,
+      htmlContent: html,
+      replyTo: {
+        email: fromEmail
+        // Brevo accepts replyTo email only; keep minimal to avoid undefined fields.
+      }
+    }
+
+
+    console.log("[Invite] Brevo payload:", JSON.stringify(brevoPayload, null, 2))
+
+    // Send via Brevo API
+    let brevoResponse
+    try {
+      brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': brevoApiKey
+        },
+        body: JSON.stringify(brevoPayload)
+      })
+    } catch (fetchErr) {
+      console.error("[Invite] Email fetch error:", fetchErr?.message || fetchErr)
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Failed to send email (network error)' }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
+
+    // Parse Brevo response
+    let brevoBody
+    try {
+      brevoBody = await brevoResponse.json()
+    } catch (parseErr) {
+      console.error("[Invite] Failed to parse Brevo response:", parseErr?.message || parseErr)
+      console.error("[Invite] Brevo response status:", brevoResponse.status)
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Failed to parse email service response' }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
+
+    // Check for Brevo API errors
+    if (!brevoResponse.ok) {
+      const errorMsg = brevoBody?.message || brevoBody?.error || `Brevo returned status ${brevoResponse.status}`
+      console.error("[Invite] Email failed with Brevo error:", errorMsg)
+      console.error("[Invite] Brevo response body:", JSON.stringify(brevoBody))
+      return new Response(
+        JSON.stringify({ ok: false, error: `Email service error: ${errorMsg}` }),
+        {
+          status: brevoResponse.status >= 500 ? 503 : 400,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
+
+    // Success: Brevo returns messageId in response
+    const messageId = brevoBody?.messageId || brevoBody?.id || null
+    console.log("[Invite] Email sent successfully via Brevo:", messageId)
+
+    return new Response(JSON.stringify({ ok: true, id: messageId }), {
       status: 200,
       headers: {
         ...corsHeaders,

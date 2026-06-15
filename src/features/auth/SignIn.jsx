@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 
+
 export default function SignIn() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -38,21 +39,18 @@ export default function SignIn() {
     setIsSubmitting(false)
 
     if (signInError) {
-      console.error('[SignIn] Signin failed:', signInError)
       setError(signInError.message)
       return
     }
 
     if (!data?.session) {
-      console.warn('[SignIn] Signin succeeded but no session')
       setInfo('Sign-in succeeded but no active session was created. Please try again.')
       return
     }
 
-    // Successful signin with session
-    console.log('[SignIn] Signin successful, redirecting to dashboard')
-    const redirect = location.state?.redirect || '/dashboard'
-    navigate(redirect, { replace: true })
+    const redirectParam = new URLSearchParams(location.search).get('redirect')
+    const destination = redirectParam || '/dashboard'
+    navigate(destination, { replace: true })
   }
 
   return (

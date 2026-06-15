@@ -98,11 +98,12 @@ export const getPendingInvitesForCompany = async (companyId) => {
 }
 
 async function assertNotActiveMember(companyId, email) {
+  // Use ilike for case-insensitive email matching since PostgreSQL = is case-sensitive
   const { data: member, error: memberErr } = await supabase
     .from('company_members')
     .select('user_id')
     .eq('company_id', companyId)
-    .eq('email', email)
+    .ilike('email', email)
     .eq('status', 'active')
     .maybeSingle()
 
@@ -195,14 +196,17 @@ export const createInvite = async ({ email, role, companyId }) => {
 export const cancelInvite = async ({ inviteId }) => {
   if (!inviteId) throw new Error('Invite id missing')
 
+  // Only cancel pending invites to prevent side effects on already-processed invites
   const { data, error } = await supabase
     .from('invites')
     .update({ status: 'cancelled' })
     .eq('id', inviteId)
+    .eq('status', 'pending')
     .select('id')
     .maybeSingle()
 
   if (error) throw new Error(error.message || 'Failed to cancel invite')
+  if (!data) throw new Error('Invite is no longer pending')
   return data
 }
 
@@ -211,14 +215,29 @@ export const resendInvite = async ({ inviteId }) => {
 
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
+  // Only allow resending for pending invites — prevents reactivating accepted ones
+  const { data: existing, error: fetchErr } = await supabase
+    .from('invites')
+    .select('id, status')
+    .eq('id', inviteId)
+    .maybeSingle()
+
+  if (fetchErr) throw new Error(fetchErr.message || 'Failed to fetch invite')
+  if (!existing) throw new Error('Invite not found')
+  if (existing.status !== 'pending') {
+    throw new Error('Only pending invites can be resent')
+  }
+
   const { data, error } = await supabase
     .from('invites')
-    .update({ expires_at: expiresAt, status: 'pending' })
+    .update({ expires_at: expiresAt })
     .eq('id', inviteId)
+    .eq('status', 'pending')
     .select('id')
     .maybeSingle()
 
   if (error) throw new Error(error.message || 'Failed to resend invite')
+  if (!data) throw new Error('Invite is no longer pending')
 
   await sendInviteEmail(inviteId)
 
@@ -243,91 +262,40 @@ export const getInviteToken = async ({ inviteId }) => {
 
 export const fetchInviteByToken = async (token) => {
   const rawToken = token == null ? '' : String(token)
-  // token in route params should already be decoded; still trim to avoid whitespace issues
   const inviteToken = rawToken.trim()
-  console.log('[invitesService] fetchInviteByToken called', { hasToken: !!inviteToken })
+
   if (!inviteToken) return null
 
-  console.log('[invitesService] Attempting RPC get_invite_for_accept')
+  // Authoritative source: RPC secured by RLS/SPCL
+  // get_invite_for_accept(p_token) returns:
+  // id, email, role, company_id, token, status, expires_at, created_by, company_name
   const { data, error } = await supabase.rpc('get_invite_for_accept', {
     p_token: inviteToken
   })
 
-  console.log('[invitesService] RPC result', {
-    rpcError: error?.message || error?.code,
-    dataFound: !!data,
-    isArray: Array.isArray(data)
-  })
+  // Normalize RPC response safely:
+  // - If data is an array, use data[0]
+  // - If data is null/empty, treat as invalid/expired invite for UI stability
+  const row = Array.isArray(data) ? data?.[0] : data
+  if (error || !row) return null
 
-  const buildInviteFromFallback = async (fallback) => {
-    if (!fallback) return null
-    console.log('[invitesService] Building invite from fallback', { fallbackId: fallback?.id })
-    const { data: company, error: companyErr } = await supabase
-      .from('companies')
-      .select('name')
-      .eq('id', fallback.company_id)
-      .maybeSingle()
+  const isExpired = (() => {
+    if (!row?.expires_at) return false
+    const d = new Date(row.expires_at)
+    if (!Number.isFinite(d.getTime())) return false
+    return d.getTime() < Date.now()
+  })()
 
-    if (companyErr) {
-      console.warn('[invitesService] Failed to load company name in fallback', { error: companyErr?.message })
-      // don't fail the invite lookup if company name can't be loaded
-      return { ...fallback, company_name: '' }
-    }
+  if (isExpired) return null
 
-    const result = { ...fallback, company_name: company?.name || '' }
-    console.log('[invitesService] Fallback invite built successfully', { inviteId: result?.id, companyName: result?.company_name })
-    return result
+  return {
+    ...row,
+    company_name: row?.company_name || ''
   }
-
-  // Always use direct lookup fallback if RPC failed OR returned no row.
-  // This prevents showing "Invalid invite link" when the RPC is blocked by RLS/JWT state.
-  if (error) {
-    console.log('[invitesService] RPC failed, attempting fallback direct lookup')
-    const { data: fallback, error: fallbackErr } = await supabase
-      .from('invites')
-      .select('*')
-      .eq('token', inviteToken)
-      .maybeSingle()
-
-    console.log('[invitesService] Fallback lookup result', {
-      fallbackError: fallbackErr?.message || fallbackErr?.code,
-      fallbackFound: !!fallback
-    })
-
-    if (fallbackErr) {
-      throw new Error(fallbackErr.message || 'Failed to fetch invite.')
-    }
-
-    return buildInviteFromFallback(fallback)
-  }
-
-  const row = Array.isArray(data) ? data[0] : data
-  console.log('[invitesService] RPC returned row', {
-    rowFound: !!row,
-    rowId: row?.id,
-    rowStatus: row?.status
-  })
-  if (!row) {
-    console.log('[invitesService] RPC returned no row, attempting fallback direct lookup')
-    const { data: fallback, error: fallbackErr } = await supabase
-      .from('invites')
-      .select('*')
-      .eq('token', inviteToken)
-      .maybeSingle()
-
-    console.log('[invitesService] Fallback lookup result', {
-      fallbackError: fallbackErr?.message || fallbackErr?.code,
-      fallbackFound: !!fallback
-    })
-
-    if (fallbackErr) {
-      throw new Error(fallbackErr.message || 'Failed to fetch invite.')
-    }
-
-    return buildInviteFromFallback(fallback)
-  }
-
-  console.log('[invitesService] Returning RPC row directly', { inviteId: row?.id })
-  return row || null
 }
+
+
+
+
+
 

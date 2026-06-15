@@ -2,28 +2,25 @@ import { Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import FullScreenLoader from '../components/common/FullScreenLoader'
 
-/**
- * RootRedirect - STRICT routing
- * - Shows loader while loading
- * - Redirects to /dashboard ONLY if authenticated with valid profile
- * - Redirects to /signin if NOT authenticated
- * 
- * Profile now comes from profileSlice (single source of truth)
- */
 export default function RootRedirect() {
-  const { user, loading } = useSelector((state) => state.auth)
+  const { user, loading, initialized } = useSelector((state) => state.auth)
   const { profile, isLoading: profileLoading } = useSelector((state) => state.profile)
 
-  // Show loader while checking auth
-  if (loading || profileLoading) {
-    return <FullScreenLoader />
+  if (!initialized || loading) {
+    return <FullScreenLoader message="Loading..." />
   }
 
-  // STRICT CHECK: Must have user AND valid profile with company_id
+  if (user?.id && profileLoading) {
+    return <FullScreenLoader message="Loading your profile..." />
+  }
+
   if (user && user.id && profile && profile.company_id) {
     return <Navigate to="/dashboard" replace />
   }
 
-  // Any invalid state - redirect to signin
+  if (user && user.id && !profile?.company_id) {
+    return <Navigate to="/dashboard" replace />
+  }
+
   return <Navigate to="/signin" replace />
 }

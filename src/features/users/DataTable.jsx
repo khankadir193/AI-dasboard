@@ -348,27 +348,7 @@ export default function DataTable() {
         throw emailErr
       }
 
-      // Render pending invite immediately + keep table in sync with server
-      // (prevents cases where pendingInvites state is overwritten by refreshes)
-      setPendingInvites(prev => {
-        // Deduplicate by email (company_members always wins)
-        const existingEmails = new Set(
-          (users || []).map(u => String(u?.email || '').toLowerCase().trim()).filter(Boolean)
-        )
-        const nextEmail = String(pendingRow?.email || '').toLowerCase().trim()
-
-        if (!nextEmail) return prev
-        if (existingEmails.has(nextEmail)) return prev
-
-        const withoutEmail = prev.filter(
-          p => String(p?.email || '').toLowerCase().trim() !== nextEmail
-        )
-        return [pendingRow, ...withoutEmail]
-      })
-
-      // Ensure pending list reflects the just-created row from invites table
       await refreshPendingInvites()
-
 
 
       showToast('Invitation sent successfully')

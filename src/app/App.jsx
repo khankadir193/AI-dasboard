@@ -14,15 +14,8 @@ import AuthProvider from '../providers/AuthProvider'
 import PrivateRoute from '../routes/PrivateRoute'
 import PublicOnlyRoute from '../routes/PublicOnlyRoute'
 import RootRedirect from '../routes/RootRedirect'
-import AcceptInvitePage from '../pages/invites/AcceptInvitePage.jsx'
+import AcceptInvitePage from '../features/invitations/pages/AcceptInvitePage.jsx'
 
-
-/**
- * App.jsx - Clean routing only
- * NO auth logic
- * NO provisioning logic
- * Allauth handled in AuthProvider
- */
 export default function App() {
   return (
     <AuthProvider>
@@ -38,11 +31,9 @@ export default function App() {
           <Route path="/ai-insights" element={<AIInsights />} />
           <Route path="/data-table" element={<DataTable />} />
           <Route path="/projects" element={<Projects />} />
-          {/* Enterprise sections */}
           <Route path="/activity-logs" element={<ActivityLogs />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<Settings />} />
-
         </Route>
         <Route path="/invite/:token" element={<AcceptInvitePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

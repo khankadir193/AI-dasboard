@@ -1,154 +1,209 @@
 import { useEffect, useState, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { supabase } from '../lib/supabaseClient'
-import { setUser, setLoading, clearUser } from '../store/slices/authSlice'
+import { setUser, setLoading, setInitialized, clearUser } from '../store/slices/authSlice'
 import { clearProfile, fetchUserProfile } from '../store/slices/profileSlice'
 import { clearTenant } from '../store/slices/tenantSlice'
 import { clearProjects } from '../store/slices/projectsSlice'
 import FullScreenLoader from '../components/common/FullScreenLoader'
 import { trackEvent } from '../features/analytics/trackEvent'
 
-/**
- * AuthProvider - Simplified authentication
- * - Auth: only handles user + loading state
- * - Profile: use async thunk from profileSlice
- * - Always ensures loading completes to prevent UI stuck
- */
+const AUTH_REQUEST_TIMEOUT_MS = 8000
+const PROFILE_RETRY_DELAY_MS = 1500
+const MAX_PROFILE_RETRIES = 10
+
+const withTimeout = (promise, label) => {
+  let timeoutId
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out`))
+    }, AUTH_REQUEST_TIMEOUT_MS)
+  })
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId))
+}
+
 export default function AuthProvider({ children }) {
   const dispatch = useDispatch()
   const [isInitialized, setIsInitialized] = useState(false)
-  const timeoutRef = useRef(null)
-  const { user } = useSelector((state) => state.auth)
-  const { profile } = useSelector((state) => state.profile)
+
+  const didInit = useRef(false)
+
+  const userInStore = useSelector((state) => state.auth.user)
+  const profileInStore = useSelector((state) => state.profile.profile)
+
+  const latestProfileIdRef = useRef(profileInStore?.company_id)
+  useEffect(() => {
+    latestProfileIdRef.current = profileInStore?.company_id
+  }, [profileInStore?.company_id])
+
+  const currentUserIdRef = useRef(userInStore?.id ?? null)
+  const lastFetchedIdRef = useRef(null)
+  const profileRetryCountRef = useRef(0)
+  const profileRetryTimerRef = useRef(null)
+
+  useEffect(() => {
+    currentUserIdRef.current = userInStore?.id ?? null
+  }, [userInStore?.id])
+
   const loginTrackedRef = useRef(false)
+
+  const attemptProfileFetch = (userId) => {
+    profileRetryCountRef.current = 0
+    lastFetchedIdRef.current = userId
+    dispatch(fetchUserProfile(userId))
+  }
+
+  const handleAuthWithProfile = (session) => {
+    const incomingUserId = session?.user?.id ?? null
+    if (!incomingUserId) return
+
+    if (incomingUserId === currentUserIdRef.current) {
+      if (incomingUserId !== lastFetchedIdRef.current) {
+        attemptProfileFetch(incomingUserId)
+      } else if (!latestProfileIdRef.current) {
+        if (profileRetryCountRef.current < MAX_PROFILE_RETRIES) {
+          profileRetryCountRef.current += 1
+          if (profileRetryTimerRef.current) {
+            clearTimeout(profileRetryTimerRef.current)
+          }
+          profileRetryTimerRef.current = setTimeout(() => {
+            lastFetchedIdRef.current = incomingUserId
+            dispatch(fetchUserProfile(incomingUserId))
+          }, PROFILE_RETRY_DELAY_MS)
+        } else {
+          profileRetryCountRef.current = 0
+          lastFetchedIdRef.current = incomingUserId
+          dispatch(fetchUserProfile(incomingUserId))
+        }
+      }
+      return
+    }
+
+    currentUserIdRef.current = incomingUserId
+    dispatch(setUser(session.user))
+
+    attemptProfileFetch(incomingUserId)
+  }
+
+  const clearSessionState = async ({ signOut = false } = {}) => {
+    if (profileRetryTimerRef.current) {
+      clearTimeout(profileRetryTimerRef.current)
+      profileRetryTimerRef.current = null
+    }
+    profileRetryCountRef.current = 0
+    if (signOut) {
+      try {
+        await withTimeout(supabase.auth.signOut(), 'signOut')
+      } catch (e) {
+      }
+    }
+    dispatch(clearUser())
+    dispatch(clearProfile())
+    dispatch(clearTenant())
+    dispatch(clearProjects())
+  }
 
   useEffect(() => {
     let isMounted = true
+    let didDispatchLoadingFalse = false
 
-    /**
-     * initializeAuth - SECURE
-     * - Step 1: Get user (validates token legitimacy)
-     * - Step 2: If user exists → get session → fetch profile
-     * - Step 3: Validate profile has company_id
-     * - ALWAYS sets loading=false to prevent stuck UI
-     */
     const initializeAuth = async () => {
+      dispatch(setLoading(true))
+
       try {
-        dispatch(setLoading(true))
+        const { data: { user: authUser }, error: userError } = await withTimeout(
+          supabase.auth.getUser(),
+          'getUser'
+        )
 
-        // Step 1: Get user (validates token is legitimate)
-        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser()
-
-        if (!isMounted) return
-
-        // If no user or error - force signOut and clear
         if (!authUser || userError) {
-          await supabase.auth.signOut()
-          dispatch(clearUser())
-          dispatch(clearProfile())
-          dispatch(clearTenant())
-          dispatch(clearProjects())
-          dispatch(setLoading(false))
-          setIsInitialized(true)
+          await clearSessionState({ signOut: true })
           return
         }
 
-        // Step 2: Get session and fetch profile
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          dispatch(setUser(session.user))
-          dispatch(fetchUserProfile(session.user.id))
+        const { data: { session } } = await withTimeout(
+          supabase.auth.getSession(),
+          'getSession'
+        )
+        if (session?.user) {
+          handleAuthWithProfile(session)
         }
-
-        dispatch(setLoading(false))
-        setIsInitialized(true)
-
-      } catch (error) {
-        // On any error, force signOut and clear
-        await supabase.auth.signOut()
-        dispatch(clearUser())
-        dispatch(clearProfile())
-        dispatch(clearTenant())
-        dispatch(clearProjects())
-        dispatch(setLoading(false))
+      } catch (e) {
+        await clearSessionState({ signOut: true })
+      } finally {
+        if (!didDispatchLoadingFalse) {
+          didDispatchLoadingFalse = true
+          dispatch(setLoading(false))
+        }
+        dispatch(setInitialized(true))
         setIsInitialized(true)
       }
     }
 
-    // Start initialization
-    initializeAuth()
+    if (!didInit.current) {
+      didInit.current = true
+      void initializeAuth()
+    }
 
-    // Timeout fallback - ensures we never get stuck
-    timeoutRef.current = setTimeout(() => {
-      if (!isInitialized) {
-        dispatch(setLoading(false))
-        setIsInitialized(true)
-      }
-    }, 5000)
-
-    /**
-     * onAuthStateChange - Handle auth events
-     * - SIGNED_IN: setUser + fetchUserProfile (async thunk)
-     * - SIGNED_OUT: clear all state
-     */
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
         if (!isMounted) return
 
-        // SIGNED_OUT - clear everything
         if (event === 'SIGNED_OUT') {
           loginTrackedRef.current = false
-          dispatch(clearUser())
-          dispatch(clearProfile())
-          dispatch(clearTenant())
-          dispatch(clearProjects())
+          currentUserIdRef.current = null
+          lastFetchedIdRef.current = null
+          profileRetryCountRef.current = 0
+          if (profileRetryTimerRef.current) {
+            clearTimeout(profileRetryTimerRef.current)
+            profileRetryTimerRef.current = null
+          }
+          void clearSessionState()
           return
         }
 
-        // SIGNED_IN - set user and dispatch profile fetch
-        if (event === 'SIGNED_IN' && session && session.user) {
-          // Always set user first
-          dispatch(setUser(session.user))
-
-          // Fetch profile via async thunk
-          dispatch(fetchUserProfile(session.user.id))
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          handleAuthWithProfile(session)
         }
       }
     )
 
     return () => {
       isMounted = false
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
+      if (profileRetryTimerRef.current) {
+        clearTimeout(profileRetryTimerRef.current)
+        profileRetryTimerRef.current = null
       }
-      subscription.unsubscribe()
+      try {
+        if (typeof authSubscription?.unsubscribe === 'function') {
+          authSubscription.unsubscribe()
+        }
+      } catch (e) {
+      }
     }
-  }, [dispatch])
+  }, [])
 
-  // Track login analytics when user and profile are available
   useEffect(() => {
-    // company must exist
-    if (!profile?.company_id) {
+    if (!profileInStore?.company_id) {
       return
     }
 
-    // already tracked for this login session
     if (loginTrackedRef.current) {
       return
     }
 
-    // lock immediately
     loginTrackedRef.current = true
 
     trackEvent({
-      companyId: profile.company_id,
+      companyId: profileInStore.company_id,
       type: 'active_users',
       value: 1
     })
-  }, [profile?.company_id])
+  }, [profileInStore?.company_id])
 
   if (!isInitialized) {
-    return <FullScreenLoader />
+    return <FullScreenLoader message="Initializing..." />
   }
 
   return children

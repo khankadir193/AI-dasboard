@@ -9,10 +9,10 @@ import FullScreenLoader from '../components/common/FullScreenLoader'
  * - Allows signin/signup if not authenticated
  */
 export default function PublicOnlyRoute({ children }) {
-  const { user, loading } = useSelector((state) => state.auth)
+  const { user, loading, initialized } = useSelector((state) => state.auth)
   const location = useLocation()
 
-  if (loading) {
+  if (!initialized) {
     return <FullScreenLoader />
   }
 
@@ -26,3 +26,4 @@ export default function PublicOnlyRoute({ children }) {
 
   return children
 }
+
