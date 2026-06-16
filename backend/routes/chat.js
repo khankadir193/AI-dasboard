@@ -3,6 +3,8 @@
  * Handles AI chat requests via Groq API proxy
  */
 
+import { SYSTEM_PROMPT } from "../lib/systemPrompt.js";
+
 export async function registerChatRoutes(app) {
   app.post('/api/chat', async (req, res) => {
     try {
@@ -15,7 +17,16 @@ export async function registerChatRoutes(app) {
       });
 
       const completion = await groq.chat.completions.create({
-        messages: [{ role: "user", content: message }],
+        messages: [
+          {
+            role: "system",
+            content: SYSTEM_PROMPT,
+          },
+          {
+            role: "user",
+            content: message,
+          },
+        ],
         model: "llama-3.1-8b-instant",
       });
 

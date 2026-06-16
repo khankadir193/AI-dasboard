@@ -1,3 +1,5 @@
+import { SYSTEM_PROMPT } from "../backend/lib/systemPrompt.js";
+
 export default async function handler(req, res) {
   try {
     if (!process.env.GROQ_API_KEY) {
@@ -19,8 +21,17 @@ export default async function handler(req, res) {
     });
 
     const response = await groq.chat.completions.create({
-      messages: [{ role: "user", content: message }],
-      
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+
       // ✅ FIXED MODEL
       model: "llama-3.1-8b-instant",
     });

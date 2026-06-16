@@ -4,29 +4,29 @@ import { getAIInsight } from '../../lib/apiClient';
 import './AIInsights.css';
 
 const ANALYSIS_TYPES = [
-  { 
-    text: 'Analyze my revenue trend: Q1=$42k, Q2=$38k, Q3=$51k, Q4=$67k. What are the key takeaways?', 
-    icon: TrendingUp, 
-    title: 'Revenue Analysis', 
-    description: 'Analyze business revenue trends and growth patterns'
+  {
+    text: 'Analyze project completion trends and identify bottlenecks.',
+    icon: TrendingUp,
+    title: 'Project Performance',
+    description: 'Analyze project completion trends, project progress, and delivery performance',
   },
-  { 
-    text: 'My user churn rate is 8% this month, up from 5% last month. What could be causing this?', 
-    icon: Users, 
-    title: 'User Behavior', 
-    description: 'Understand user activity and churn trends'
+  {
+    text: 'Analyze team productivity and workload distribution.',
+    icon: Users,
+    title: 'Team Productivity',
+    description: 'Review team workload, contribution patterns, and productivity metrics',
   },
-  { 
-    text: 'Compare these two campaigns: Campaign A had 5000 clicks, 2% conversion, $2 CPC. Campaign B had 8000 clicks, 1.2% conversion, $1.5 CPC.', 
-    icon: Target, 
-    title: 'Campaign Comparison', 
-    description: 'Compare marketing campaigns and conversion metrics'
+  {
+    text: 'Analyze recent activity logs and highlight key trends.',
+    icon: Target,
+    title: 'Activity Insights',
+    description: 'Review activity logs and identify engagement patterns',
   },
-  { 
-    text: 'My top 3 products by revenue: Product A $32k, Product B $18k, Product C $9k. How should I prioritize my roadmap?', 
-    icon: Package, 
-    title: 'Product Performance', 
-    description: 'Identify top-performing products and opportunities'
+  {
+    text: 'Analyze dashboard metrics and identify improvement opportunities.',
+    icon: Package,
+    title: 'Dashboard Analytics',
+    description: 'Summarize dashboard metrics and overall workspace health',
   },
 ];
 
@@ -62,7 +62,7 @@ function InsightMessage({ role, content }) {
           {lines.map((line, i) => {
             const isBullet = line.startsWith('•') || line.startsWith('-') || line.startsWith('*');
             const boldMatch = line.match(/\*\*(.*?)\*\*/g);
-            
+
             let processedLine = line;
             if (boldMatch) {
               boldMatch.forEach(bold => {
@@ -70,7 +70,7 @@ function InsightMessage({ role, content }) {
                 processedLine = processedLine.replace(bold, `<strong class="text-gray-900 dark:text-white">${text}</strong>`);
               });
             }
-            
+
             if (isBullet) {
               const bulletChar = line[0];
               const rest = line.substring(1).trim();
@@ -81,7 +81,7 @@ function InsightMessage({ role, content }) {
                 </div>
               );
             }
-            
+
             return <p key={i} dangerouslySetInnerHTML={{ __html: processedLine }} />;
           })}
         </div>
@@ -151,11 +151,11 @@ export default function AIInsights() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">AI Insights</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Analyze your business data with AI</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Analyze projects, teams, activity logs, and workspace performance using AI.</p>
           </div>
         </div>
         {messages.length > 0 && (
-          <button 
+          <button
             onClick={handleReset}
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all flex items-center gap-1.5 border border-gray-200 dark:border-gray-700"
           >
@@ -237,7 +237,7 @@ export default function AIInsights() {
                   handleSend();
                 }
               }}
-              placeholder="Ask me about revenue, churn, user trends, or growth..."
+              placeholder="Ask about projects, team productivity, activity logs, or dashboard metrics..."
               className="w-full text-sm bg-transparent text-gray-900 dark:text-white placeholder-gray-400 rounded-lg px-3 py-2 resize-y outline-none border-none min-h-[48px] sm:min-h-[52px] max-h-[120px] transition-all duration-200 ease-in-out"
             />
             <button
