@@ -2,7 +2,7 @@ import { Route, Routes, Navigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout.jsx'
 import Dashboard from '../features/dashboard/Dashboard.jsx'
 import Analytics from '../features/analytics/Analytics.jsx'
-import AIInsights from '../features/ai/AIInsights.jsx'
+import AIInsightsPage from '../features/ai/pages/AIInsightsPage.jsx'
 import DataTable from '../features/users/DataTable.jsx'
 import Projects from '../features/projects/Projects.jsx'
 import Settings from '../features/organization/Settings.jsx'
@@ -28,7 +28,7 @@ export default function App() {
         <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/analytics" element={<Analytics />} />
-          <Route path="/ai-insights" element={<AIInsights />} />
+          <Route path="/ai-insights" element={<AIInsightsPage />} />
           <Route path="/data-table" element={<DataTable />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/activity-logs" element={<ActivityLogs />} />
