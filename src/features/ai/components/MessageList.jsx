@@ -4,16 +4,14 @@ import MessageBubble from './MessageBubble';
 
 function MessageList({ messages, historyLoading, loading, error, messagesContainerRef }) {
     return (
-        <div className="max-w-3xl mx-auto px-2 sm:px-0 py-6">
-            <div className="space-y-6" ref={messagesContainerRef}>
+        <div className="w-full py-4">
+            <div className="space-y-4" ref={messagesContainerRef}>
                 {historyLoading ? (
                     <div className="flex gap-3">
                         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                            <span className="text-white animate-spin inline-flex">
-                                {/* Keep icon space similar; existing UI uses Loader2 */}
-                            </span>
+                            <span className="text-white animate-spin inline-flex" />
                         </div>
-                        <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-sm p-4 flex items-center gap-2 text-sm text-gray-500 border border-gray-100 dark:border-gray-700 shadow-sm">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-sm p-3 flex items-center gap-2 text-sm text-gray-500 border border-gray-100 dark:border-gray-700">
                             <span className="inline-flex gap-1">
                                 <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0ms]" />
                                 <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:150ms]" />

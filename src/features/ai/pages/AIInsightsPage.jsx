@@ -60,8 +60,6 @@ export default function AIInsightsPage() {
 
     return (
         <ChatLayout
-            headerTitle="AI Insights"
-            headerSubtitle="Analyze projects, teams, activity logs, and workspace performance using AI."
             onNewChat={handleNewChat}
             sidebar={
                 <ConversationSidebar
