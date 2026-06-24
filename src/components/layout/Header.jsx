@@ -12,7 +12,7 @@ import { clearProjects } from '../../store/slices/projectsSlice'
 const pageTitles = {
   '/dashboard':   { title: 'Dashboard',    subtitle: 'Welcome back, John Doe' },
   '/dashboard/analytics':   { title: 'Analytics',    subtitle: 'Deep dive into your metrics' },
-  '/dashboard/ai-insights': { title: 'AI Insights', subtitle: 'Powered by GPT-4' },
+  '/ai-insights': { title: 'AI Insights', subtitle: 'Powered by GPT-4' },
   '/data-table': { title: 'Team Management', subtitle: 'Manage members, roles, and access' },
   '/dashboard/settings':    { title: 'Settings',     subtitle: 'Manage your preferences' },
 }

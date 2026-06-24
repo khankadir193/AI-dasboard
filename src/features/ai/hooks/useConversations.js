@@ -5,6 +5,7 @@ export default function useConversations() {
     const [conversations, setConversations] = useState([]);
     const [activeConversationId, setActiveConversationId] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [initialized, setInitialized] = useState(false);
 
     const didLoadHistoryRef = useRef(false);
     const isMountedRef = useRef(true);
@@ -84,6 +85,8 @@ export default function useConversations() {
                 }
             } catch (e) {
                 console.log('[AIInsights] Failed to load previous chats', e?.message || e);
+            } finally {
+                if (isMountedRef.current) setInitialized(true);
             }
         };
 
@@ -135,6 +138,8 @@ export default function useConversations() {
         selectConversation,
         updateConversationTimestamp,
         refreshConversationList,
+        resetActiveConversationId,
         loading,
+        initialized,
     };
 }
