@@ -10,14 +10,14 @@ import { clearTenant } from '../../store/slices/tenantSlice'
 import { clearProjects } from '../../store/slices/projectsSlice'
 
 const pageTitles = {
-  '/dashboard':     { title: 'Dashboard',     subtitle: 'Welcome back, John Doe' },
-  '/analytics':     { title: 'Analytics',     subtitle: 'Deep dive into your metrics' },
-  '/ai-insights':   { title: 'AI Insights',   subtitle: 'Powered by GPT-4' },
-  '/projects':      { title: 'Projects',      subtitle: '' },
-  '/data-table':    { title: 'Team Management', subtitle: 'Manage members, roles, and access' },
-  '/activity-logs': { title: 'Activity Logs', subtitle: '' },
-  '/notifications': { title: 'Notifications', subtitle: '' },
-  '/settings':      { title: 'Settings',      subtitle: 'Manage your preferences' },
+  '/dashboard': { title: 'Dashboard', subtitle: 'Welcome back, John Doe' },
+  '/analytics': { title: 'Analytics', subtitle: 'Deep dive into your metrics' },
+  '/ai-insights': { title: 'AI Insights', subtitle: 'Powered by GPT-4' },
+  '/projects': { title: 'Projects', subtitle: 'Manage all your projects' },
+  '/data-table': { title: 'Team Management', subtitle: 'Manage members, roles, and access' },
+  '/activity-logs': { title: 'Activity Logs', subtitle: 'Track your recent activities' },
+  '/notifications': { title: 'Notifications', subtitle: 'View your recent notifications' },
+  '/settings': { title: 'Settings', subtitle: 'Manage your preferences' },
 }
 
 
@@ -28,7 +28,7 @@ export default function Header({ onMenuClick }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const page = pageTitles[pathname] || { title: 'Dashboard', subtitle: '' }
-  
+
   const displayName = user?.email?.split('@')[0] || 'User'
   const subtitle = pathname === '/dashboard' ? `Welcome back, ${displayName}` : page.subtitle
 
@@ -39,10 +39,10 @@ export default function Header({ onMenuClick }) {
       dispatch(clearProfile())
       dispatch(clearTenant())
       dispatch(clearProjects())
-      
+
       // Then sign out from Supabase
       await supabase.auth.signOut()
-      
+
       // Navigate to login
       navigate('/signin', { replace: true })
     } catch (error) {
