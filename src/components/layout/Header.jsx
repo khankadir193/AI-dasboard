@@ -10,11 +10,14 @@ import { clearTenant } from '../../store/slices/tenantSlice'
 import { clearProjects } from '../../store/slices/projectsSlice'
 
 const pageTitles = {
-  '/dashboard':   { title: 'Dashboard',    subtitle: 'Welcome back, John Doe' },
-  '/dashboard/analytics':   { title: 'Analytics',    subtitle: 'Deep dive into your metrics' },
-  '/ai-insights': { title: 'AI Insights', subtitle: 'Powered by GPT-4' },
-  '/data-table': { title: 'Team Management', subtitle: 'Manage members, roles, and access' },
-  '/dashboard/settings':    { title: 'Settings',     subtitle: 'Manage your preferences' },
+  '/dashboard':     { title: 'Dashboard',     subtitle: 'Welcome back, John Doe' },
+  '/analytics':     { title: 'Analytics',     subtitle: 'Deep dive into your metrics' },
+  '/ai-insights':   { title: 'AI Insights',   subtitle: 'Powered by GPT-4' },
+  '/projects':      { title: 'Projects',      subtitle: '' },
+  '/data-table':    { title: 'Team Management', subtitle: 'Manage members, roles, and access' },
+  '/activity-logs': { title: 'Activity Logs', subtitle: '' },
+  '/notifications': { title: 'Notifications', subtitle: '' },
+  '/settings':      { title: 'Settings',      subtitle: 'Manage your preferences' },
 }
 
 
