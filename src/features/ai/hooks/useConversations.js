@@ -17,7 +17,7 @@ export default function useConversations() {
         };
     }, []);
 
-    const refreshConversationList = useCallback(async () => {
+    const refreshConversationList = useCallback(async (keepActiveId) => {
         try {
             setLoading(true);
             const user = await apiService.getSupabaseUser();
@@ -38,8 +38,10 @@ export default function useConversations() {
             setConversations(list);
 
             const latest = list[0];
-            // Keep current active selection if it still exists; otherwise fall back to latest.
-            const activeStillExists = !!(activeConversationId && list.some((c) => c.id === activeConversationId));
+            // Use explicit ID when provided (e.g. freshly created conversation)
+            // to avoid stale closure issues while React state is still queued.
+            const effectiveActiveId = keepActiveId ?? activeConversationId;
+            const activeStillExists = !!(effectiveActiveId && list.some((c) => c.id === effectiveActiveId));
             if (!activeStillExists) {
                 setActiveConversationId(latest?.id || null);
             }
@@ -106,9 +108,12 @@ export default function useConversations() {
         if (convErr) throw convErr;
         if (!created?.id) throw new Error('Conversation creation returned no id.');
 
-        if (isMountedRef.current) setActiveConversationId(created.id);
+        if (isMountedRef.current) {
+            setActiveConversationId(created.id);
+            await refreshConversationList(created.id);
+        }
         return created.id;
-    }, []);
+    }, [refreshConversationList]);
 
     const selectConversation = useCallback(async (convId) => {
         if (!convId) return;
