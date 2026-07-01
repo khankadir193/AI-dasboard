@@ -6,7 +6,7 @@ const KPISection = memo(({ kpiData = {} }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
       <KPICard
-        title="Active Users"
+        title="User Logins"
         value={(Number(kpiData.activeUsers) || 0).toLocaleString()}
         change={0}
         changeLabel="last 30 days"

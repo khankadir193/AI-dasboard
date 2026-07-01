@@ -9,7 +9,7 @@ const EventDistributionChart = memo(({ kpiData = {}, loading = false, error = nu
   // Transform kpiData to chart format
   const chartData = [
     { name: 'Dashboard Views', value: kpiData.dashboardViews || 0 },
-    { name: 'Active Users', value: kpiData.activeUsers || 0 },
+    { name: 'User Logins', value: kpiData.activeUsers || 0 },
     { name: 'Projects Updated', value: kpiData.projectsUpdated || 0 },
     { name: 'Projects Created', value: kpiData.projectsCreated || 0 },
     { name: 'Projects Deleted', value: kpiData.projectsDeleted || 0 }

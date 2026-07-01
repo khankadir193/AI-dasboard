@@ -91,7 +91,7 @@ class TenantApiService {
       // Return mock data for demo purposes
       return [
         { id: '1', title: 'Total Revenue', value: 84250, change: 12.5, trend: 'up', created_at: new Date().toISOString() },
-        { id: '2', title: 'Active Users', value: 12430, change: 8.2, trend: 'up', created_at: new Date().toISOString() },
+        { id: '2', title: 'User Logins', value: 12430, change: 8.2, trend: 'up', created_at: new Date().toISOString() },
         { id: '3', title: 'Conversion Rate', value: 3.6, change: -1.4, trend: 'down', created_at: new Date().toISOString() },
         { id: '4', title: 'New Orders', value: 1893, change: 5.7, trend: 'up', created_at: new Date().toISOString() }
       ]
@@ -110,7 +110,7 @@ class TenantApiService {
       // Return mock data for demo purposes
       return [
         { id: '1', title: 'Total Revenue', value: 84250, change: 12.5, trend: 'up', created_at: new Date().toISOString() },
-        { id: '2', title: 'Active Users', value: 12430, change: 8.2, trend: 'up', created_at: new Date().toISOString() },
+        { id: '2', title: 'User Logins', value: 12430, change: 8.2, trend: 'up', created_at: new Date().toISOString() },
         { id: '3', title: 'Conversion Rate', value: 3.6, change: -1.4, trend: 'down', created_at: new Date().toISOString() },
         { id: '4', title: 'New Orders', value: 1893, change: 5.7, trend: 'up', created_at: new Date().toISOString() }
       ]
