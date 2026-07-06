@@ -205,8 +205,8 @@ class AnalyticsApiService {
     }
   }
 
-  // Fetch recent activity for activity feed
-  async fetchRecentActivity(limit = 10) {
+  // Fetch ALL analytics_data in a date range (single query for KPIs + timeline + distribution)
+  async fetchAllData(startDate, endDate) {
     if (!this.currentCompanyId) {
       throw new Error('Company ID not set. Please authenticate first.')
     }
@@ -216,6 +216,45 @@ class AnalyticsApiService {
         .from('analytics_data')
         .select('*')
         .eq('company_id', this.currentCompanyId)
+        .gte('metric_date', startDate)
+        .lte('metric_date', endDate)
+        .order('metric_date', { ascending: true })
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Error fetching analytics data:', error)
+      throw error
+    }
+  }
+
+  // Fetch recent activity for activity feed, filtered by date range
+  async fetchRecentActivity(startDate = null, endDate = null, limit = 10) {
+    if (!this.currentCompanyId) {
+      throw new Error('Company ID not set. Please authenticate first.')
+    }
+
+    // Support legacy call: fetchRecentActivity(10)
+    if (typeof startDate === 'number') {
+      limit = startDate
+      startDate = null
+      endDate = null
+    }
+
+    try {
+      let query = supabase
+        .from('analytics_data')
+        .select('*')
+        .eq('company_id', this.currentCompanyId)
+
+      if (startDate) {
+        query = query.gte('metric_date', startDate)
+      }
+      if (endDate) {
+        query = query.lte('metric_date', endDate)
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(limit)
 

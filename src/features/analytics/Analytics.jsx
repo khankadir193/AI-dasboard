@@ -4,8 +4,10 @@ import {
 } from 'recharts'
 import { useSelector } from 'react-redux'
 import { analyticsApi } from '../../lib/analyticsApi'
+import { supabase } from '../../lib/supabaseClient'
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, TrendingUp, Clock, Activity } from 'lucide-react'
+import DateRangeFilter from '../../components/common/DateRangeFilter'
 
 // Reusable event label mapping
 const EVENT_LABELS = {
@@ -26,98 +28,98 @@ const EVENT_COLORS = {
 
 export default function Analytics() {
   const { profile } = useSelector((state) => state.profile)
-  const [activeUsers, setActiveUsers] = useState([])
-  const [projectsCreated, setProjectsCreated] = useState([])
-  const [projectsUpdated, setProjectsUpdated] = useState([])
-  const [projectsDeleted, setProjectsDeleted] = useState([])
-  const [dashboardViews, setDashboardViews] = useState([])
 
-  const [eventCounts, setEventCounts] = useState({
-    activeUsers: 0,
-    projectsCreated: 0,
-    projectsUpdated: 0,
-    projectsDeleted: 0,
-    dashboardViews: 0
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date()
+    const start = new Date()
+    start.setDate(start.getDate() - 30)
+    return {
+      preset: '30',
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+      label: 'Last 30 Days'
+    }
   })
 
+  const [rawData, setRawData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (profile?.company_id) {
+    if (profile?.company_id && dateRange?.startDate && dateRange?.endDate) {
       analyticsApi.setCompanyId(profile.company_id)
-      fetchRealAnalyticsData()
+      fetchData(dateRange.startDate, dateRange.endDate)
     }
-  }, [profile])
+  }, [profile?.company_id, dateRange?.startDate, dateRange?.endDate])
 
-  const fetchRealAnalyticsData = async () => {
+  // Realtime: auto-refresh when new analytics_data row is inserted
+  useEffect(() => {
+    if (!profile?.company_id) return
+
+    const channel = supabase
+      .channel('analytics_page_realtime')
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'analytics_data',
+          filter: `company_id=eq.${profile.company_id}`
+        },
+        () => {
+          if (dateRange?.startDate && dateRange?.endDate) {
+            fetchData(dateRange.startDate, dateRange.endDate)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [profile?.company_id, dateRange?.startDate, dateRange?.endDate])
+
+  const fetchData = async (startDate, endDate) => {
     try {
       setLoading(true)
       setError(null)
-
-      const [
-        fetchedActiveUsers,
-        fetchedProjectsCreated,
-        fetchedProjectsUpdated,
-        fetchedProjectsDeleted,
-        fetchedDashboardViews
-      ] = await Promise.all([
-        analyticsApi.fetchAnalyticsData('active_users', 30),
-        analyticsApi.fetchAnalyticsData('projects_created', 30),
-        analyticsApi.fetchAnalyticsData('projects_updated', 30),
-        analyticsApi.fetchAnalyticsData('projects_deleted', 30),
-        analyticsApi.fetchAnalyticsData('dashboard_view', 30)
-      ])
-
-      setActiveUsers(Array.isArray(fetchedActiveUsers) ? fetchedActiveUsers : [])
-      setProjectsCreated(Array.isArray(fetchedProjectsCreated) ? fetchedProjectsCreated : [])
-      setProjectsUpdated(Array.isArray(fetchedProjectsUpdated) ? fetchedProjectsUpdated : [])
-      setProjectsDeleted(Array.isArray(fetchedProjectsDeleted) ? fetchedProjectsDeleted : [])
-      setDashboardViews(Array.isArray(fetchedDashboardViews) ? fetchedDashboardViews : [])
-
-      setEventCounts({
-        activeUsers: (fetchedActiveUsers || []).reduce((sum, item) => sum + (item?.metric_value || 1), 0),
-        projectsCreated: (fetchedProjectsCreated || []).reduce((sum, item) => sum + (item?.metric_value || 1), 0),
-        projectsUpdated: (fetchedProjectsUpdated || []).reduce((sum, item) => sum + (item?.metric_value || 1), 0),
-        projectsDeleted: (fetchedProjectsDeleted || []).reduce((sum, item) => sum + (item?.metric_value || 1), 0),
-        dashboardViews: (fetchedDashboardViews || []).reduce((sum, item) => sum + (item?.metric_value || 1), 0)
-      })
+      const data = await analyticsApi.fetchAllData(startDate, endDate)
+      setRawData(Array.isArray(data) ? data : [])
     } catch (err) {
-      console.error('[Analytics] Failed to fetch real data:', err)
+      console.error('[Analytics] Failed to fetch data:', err)
       setError('Failed to load analytics data')
-
-      setActiveUsers([])
-      setProjectsCreated([])
-      setProjectsUpdated([])
-      setProjectsDeleted([])
-      setDashboardViews([])
-      setEventCounts({
-        activeUsers: 0,
-        projectsCreated: 0,
-        projectsUpdated: 0,
-        projectsDeleted: 0,
-        dashboardViews: 0
-      })
+      setRawData([])
     } finally {
       setLoading(false)
     }
   }
 
+  const eventCounts = useMemo(() => {
+    const counts = { activeUsers: 0, projectsCreated: 0, projectsUpdated: 0, projectsDeleted: 0, dashboardViews: 0 }
+    rawData.forEach(item => {
+      const val = item?.metric_value ?? 1
+      switch (item.metric_type) {
+        case 'active_users': counts.activeUsers += val; break
+        case 'projects_created': counts.projectsCreated += val; break
+        case 'projects_updated': counts.projectsUpdated += val; break
+        case 'projects_deleted': counts.projectsDeleted += val; break
+        case 'dashboard_view': counts.dashboardViews += val; break
+      }
+    })
+    return counts
+  }, [rawData])
+
   const allEvents = useMemo(() => {
-    const safe = (arr) => (Array.isArray(arr) ? arr : [])
-    return [
-      ...safe(activeUsers).map((item) => ({ ...item, label: EVENT_LABELS.active_users, metric_key: 'active_users' })),
-      ...safe(projectsCreated).map((item) => ({ ...item, label: EVENT_LABELS.projects_created, metric_key: 'projects_created' })),
-      ...safe(projectsUpdated).map((item) => ({ ...item, label: EVENT_LABELS.projects_updated, metric_key: 'projects_updated' })),
-      ...safe(projectsDeleted).map((item) => ({ ...item, label: EVENT_LABELS.projects_deleted, metric_key: 'projects_deleted' })),
-      ...safe(dashboardViews).map((item) => ({ ...item, label: EVENT_LABELS.dashboard_view, metric_key: 'dashboard_view' })),
-    ]
-  }, [activeUsers, projectsCreated, projectsUpdated, projectsDeleted, dashboardViews])
+    return rawData.map(item => ({
+      ...item,
+      label: EVENT_LABELS[item.metric_type] || item.metric_type,
+      metric_key: item.metric_type
+    }))
+  }, [rawData])
 
   const timelineData = useMemo(() => {
-    if (!allEvents.length) return []
+    if (!rawData.length) return []
 
-    const eventsByDate = allEvents.reduce((acc, item) => {
+    const eventsByDate = rawData.reduce((acc, item) => {
       const createdAt = item?.created_at || item?.metric_date
       const dt = createdAt ? new Date(createdAt) : null
       if (!dt || Number.isNaN(dt.getTime())) return acc
@@ -127,12 +129,12 @@ export default function Analytics() {
         acc[date] = { date, events: 0 }
       }
 
-      acc[date].events += (item?.metric_value || 1)
+      acc[date].events += (item?.metric_value ?? 1)
       return acc
     }, {})
 
     return Object.values(eventsByDate)
-  }, [allEvents])
+  }, [rawData])
 
   const mostActiveEvent = useMemo(() => {
     const entries = [
@@ -198,20 +200,13 @@ export default function Analytics() {
     }
   }, [allEvents])
 
-  // Calculate unique days tracked for average daily events
-  const uniqueDaysTracked = useMemo(() => {
-    const dates = new Set()
-    allEvents.forEach(event => {
-      const createdAt = event?.created_at || event?.metric_date
-      if (createdAt) {
-        const dt = new Date(createdAt)
-        if (!Number.isNaN(dt.getTime())) {
-          dates.add(dt.toDateString())
-        }
-      }
-    })
-    return dates.size
-  }, [allEvents])
+  // Calculate days in selected range for average daily events
+  const daysInRange = useMemo(() => {
+    if (!dateRange?.startDate || !dateRange?.endDate) return 0
+    const start = new Date(dateRange.startDate)
+    const end = new Date(dateRange.endDate)
+    return Math.max(1, Math.round((end - start) / 86400000) + 1)
+  }, [dateRange])
 
   const totalEventsTracked = useMemo(() => {
     return (
@@ -224,9 +219,9 @@ export default function Analytics() {
   }, [eventCounts])
 
   const averageDailyEvents = useMemo(() => {
-    if (uniqueDaysTracked === 0) return 0
-    return Math.round(totalEventsTracked / uniqueDaysTracked)
-  }, [totalEventsTracked, uniqueDaysTracked])
+    if (daysInRange === 0) return 0
+    return Math.round(totalEventsTracked / daysInRange)
+  }, [totalEventsTracked, daysInRange])
 
 
   if (loading) {
@@ -251,6 +246,8 @@ export default function Analytics() {
 
   return (
     <div className="space-y-6 stagger">
+      <DateRangeFilter value={dateRange} onChange={setDateRange} />
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* User Growth Line Chart */}
         <div className="card p-5">

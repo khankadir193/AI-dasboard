@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { Loader2 } from 'lucide-react'
@@ -11,6 +11,7 @@ import ActivityTimelineChart from './components/Charts/ActivityTimelineChart'
 import EventDistributionChart from './components/Charts/EventDistributionChart'
 import ProjectStatusChart from './components/Charts/ProjectStatusChart'
 import RecentActivityFeed from './components/ActivityFeed/RecentActivityFeed'
+import DateRangeFilter from '../../components/common/DateRangeFilter'
 import { trackEvent } from '../analytics/trackEvent'
 
 export default function Dashboard() {
@@ -19,8 +20,20 @@ export default function Dashboard() {
   const { profile } = useSelector((state) => state.profile)
   const dashboardTrackedRef = useRef(false)
 
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date()
+    const start = new Date()
+    start.setDate(start.getDate() - 30)
+    return {
+      preset: '30',
+      startDate: start.toISOString().split('T')[0],
+      endDate: end.toISOString().split('T')[0],
+      label: 'Last 30 Days'
+    }
+  })
+
   // Hooks for extracted logic
-  const { analyticsData = { isLoading: true, kpiData: {}, activityTimelineData: [], userActivityData: [], projectStatusData: [], recentActivity: [], error: null } } = useAnalytics()
+  const { analyticsData = { isLoading: true, kpiData: {}, growthData: {}, activityTimelineData: [], userActivityData: [], projectStatusData: [], recentActivity: [], error: null } } = useAnalytics(dateRange)
   const { trialInfo = { isLoading: false, trialEnd: null, isExpired: false, daysLeft: 0 } } = useTrial()
 
   useEffect(() => {
@@ -57,6 +70,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 stagger">
+      {/* Date Range Filter */}
+      <DateRangeFilter value={dateRange} onChange={setDateRange} />
+
       {!trialInfo.isLoading && trialInfo.trialEnd && (
         <div
           className={`rounded-xl border px-4 py-3 ${
@@ -72,7 +88,7 @@ export default function Dashboard() {
       )}
 
       {/* KPI Section */}
-      <KPISection kpiData={analyticsData.kpiData} />
+      <KPISection kpiData={analyticsData.kpiData} growthData={analyticsData.growthData} dateLabel={dateRange.label} />
 
       {/* Charts row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
