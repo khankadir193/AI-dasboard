@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { Loader2 } from 'lucide-react'
 
 // Local imports
-import { useAnalytics } from './hooks/useAnalytics'
+import { useDashboardAnalytics } from './hooks/useDashboardAnalytics'
 import { useTrial } from './hooks/useTrial'
+import { useAnalyticsSubscription } from '../../hooks/useAnalyticsSubscription'
 import KPISection from './components/KPI/KPISection'
 import ActivityTimelineChart from './components/Charts/ActivityTimelineChart'
 import EventDistributionChart from './components/Charts/EventDistributionChart'
@@ -18,7 +19,6 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { user, loading: isAuthLoading } = useSelector((state) => state.auth)
   const { profile } = useSelector((state) => state.profile)
-  const dashboardTrackedRef = useRef(false)
 
   const [dateRange, setDateRange] = useState(() => {
     const end = new Date()
@@ -32,9 +32,13 @@ export default function Dashboard() {
     }
   })
 
-  // Hooks for extracted logic
-  const { analyticsData = { isLoading: true, kpiData: {}, growthData: {}, activityTimelineData: [], userActivityData: [], projectStatusData: [], recentActivity: [], error: null } } = useAnalytics(dateRange)
+  const { data: analyticsData, isLoading, error, refetch } = useDashboardAnalytics(dateRange)
   const { trialInfo = { isLoading: false, trialEnd: null, isExpired: false, daysLeft: 0 } } = useTrial()
+  const { pathname } = useLocation()
+
+  const dashboardTrackedRef = useRef(false)
+
+  useAnalyticsSubscription(profile?.company_id)
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -42,12 +46,10 @@ export default function Dashboard() {
     }
   }, [isAuthLoading, user, navigate])
 
-  // Track dashboard view analytics once when profile is loaded
+  // Track dashboard view on every route entry (deduped against StrictMode double-mount)
   useEffect(() => {
     if (!profile?.company_id) return
-
     if (dashboardTrackedRef.current) return
-
     dashboardTrackedRef.current = true
 
     trackEvent({
@@ -57,7 +59,7 @@ export default function Dashboard() {
     })
   }, [profile?.company_id])
 
-  if (analyticsData.isLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -88,34 +90,34 @@ export default function Dashboard() {
       )}
 
       {/* KPI Section */}
-      <KPISection kpiData={analyticsData.kpiData} growthData={analyticsData.growthData} dateLabel={dateRange.label} />
+      <KPISection kpiData={analyticsData?.kpiData} growthData={analyticsData?.growthData} dateLabel={dateRange.label} loading={isLoading} error={error} onRetry={refetch} />
 
       {/* Charts row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <ActivityTimelineChart
-          data={analyticsData.activityTimelineData}
-          loading={analyticsData.isLoading}
-          error={analyticsData.error}
+          data={analyticsData?.activityTimelineData}
+          loading={isLoading}
+          error={error}
         />
         <ProjectStatusChart
-          data={analyticsData.projectStatusData}
-          loading={analyticsData.isLoading}
-          error={analyticsData.error}
+          data={analyticsData?.projectStatusData}
+          loading={isLoading}
+          error={error}
         />
       </div>
 
       {/* Event Distribution Chart */}
       <EventDistributionChart
-        kpiData={analyticsData.kpiData}
-        loading={analyticsData.isLoading}
-        error={analyticsData.error}
+        kpiData={analyticsData?.kpiData}
+        loading={isLoading}
+        error={error}
       />
 
       {/* Recent Activity */}
       <RecentActivityFeed
-        activities={analyticsData.recentActivity}
-        loading={analyticsData.isLoading}
-        error={analyticsData.error}
+        activities={analyticsData?.recentActivity}
+        loading={isLoading}
+        error={error}
       />
     </div>
   )

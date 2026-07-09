@@ -39,8 +39,8 @@ export async function trackEvent({ companyId, type, value = 1, metadata = {} }) 
     return
   }
 
-  // Non-blocking insert - fire and forget
-  supabase
+  // Non-blocking insert
+  return supabase
     .from('analytics_data')
     .insert({
       company_id: companyId,
@@ -50,12 +50,11 @@ export async function trackEvent({ companyId, type, value = 1, metadata = {} }) 
       metadata
     })
     .then(({ error }) => {
-      // Handle duplicate conflict silently (error code 23505)
-      if (error && error.code !== '23505') {
-        // Silently fail to avoid blocking UI
+      if (error) {
+        console.error(`[trackEvent] FAILED: type="${type}" companyId="${companyId}" value=${value}`, error)
       }
     })
-    .catch(() => {
-      // Silently fail to avoid blocking UI
+    .catch((err) => {
+      console.error(`[trackEvent] UNEXPECTED ERROR: type="${type}" companyId="${companyId}"`, err)
     })
 }

@@ -165,7 +165,7 @@ export default function Projects() {
   // ============================
   const handleAddProject = async (e) => {
     e.preventDefault()
-    if (!canCreate) return
+    if (!canCreate || creating) return
 
     const validationError = validateProjectName(newProjectName)
     if (validationError) {
@@ -207,7 +207,7 @@ export default function Projects() {
 
   const handleUpdateProject = async (e) => {
     e.preventDefault()
-    if (!canUpdate) return
+    if (!canUpdate || updating) return
 
     if (!editingProjectId || !editProjectName.trim()) {
       setFormError('Project name is required')

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../../lib/supabaseClient'
+import { analyticsService } from '../../services/analyticsService'
 import { Button } from '../../components/ui'
 import { Input } from '../../components/ui'
 import { Badge } from '../../components/ui'
@@ -90,15 +90,8 @@ export default function ActivityLogs() {
         setError(null)
 
         const allowedTypes = Object.keys(EVENT_DEFS)
-
-        const { data, error: fetchError } = await supabase
-          .from('analytics_data')
-          .select('*')
-          .eq('company_id', companyId)
-          .in('metric_type', allowedTypes)
-          .order('created_at', { ascending: false })
-
-        if (fetchError) throw fetchError
+        analyticsService.setCompanyId(companyId)
+        const data = await analyticsService.fetchEventsByTypes(allowedTypes)
 
         if (!cancelled) {
           setEvents(Array.isArray(data) ? data : [])

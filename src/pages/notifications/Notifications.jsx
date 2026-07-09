@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSelector } from 'react-redux'
-import { supabase } from '../../lib/supabaseClient'
+import { analyticsService } from '../../services/analyticsService'
 import EmptyState from '../../components/common/EmptyState'
 import Spinner from '../../components/ui/Spinner'
 import { Card } from '../../components/ui/Card'
@@ -109,14 +109,9 @@ export default function Notifications() {
         setError(null)
 
         const allowedTypes = Object.keys(EVENT_DEFS)
-        const { data, error: fetchError } = await supabase
-          .from('analytics_data')
-          .select('*')
-          .eq('company_id', companyId)
-          .in('metric_type', allowedTypes)
-          .order('created_at', { ascending: false })
+        analyticsService.setCompanyId(companyId)
+        const data = await analyticsService.fetchEventsByTypes(allowedTypes)
 
-        if (fetchError) throw fetchError
         if (!cancelled) {
           setEvents(Array.isArray(data) ? data : [])
           setLoading(false)

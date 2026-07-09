@@ -47,6 +47,7 @@ export default function AuthProvider({ children }) {
   }, [userInStore?.id])
 
   const loginTrackedRef = useRef(false)
+  const pendingSignInRef = useRef(false)
 
   const attemptProfileFetch = (userId) => {
     profileRetryCountRef.current = 0
@@ -163,7 +164,11 @@ export default function AuthProvider({ children }) {
           return
         }
 
-        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+          handleAuthWithProfile(session)
+        }
+        if (event === 'SIGNED_IN') {
+          pendingSignInRef.current = true
           handleAuthWithProfile(session)
         }
       }
@@ -185,15 +190,12 @@ export default function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    if (!profileInStore?.company_id) {
-      return
-    }
-
-    if (loginTrackedRef.current) {
-      return
-    }
+    if (!profileInStore?.company_id) return
+    if (!pendingSignInRef.current) return
+    if (loginTrackedRef.current) return
 
     loginTrackedRef.current = true
+    pendingSignInRef.current = false
 
     trackEvent({
       companyId: profileInStore.company_id,
