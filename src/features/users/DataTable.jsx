@@ -54,10 +54,11 @@ import { TableLoadingState, TableErrorState, TableEmptyState } from './component
 import Modal from '../../components/common/Modal'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
+import FeatureGate from '../../components/auth/FeatureGate'
 
 const PENDING_STATUS = 'Pending'
 
-export default function DataTable() {
+function DataTableContent() {
   const dispatch = useDispatch()
   const { data: rawUsers, isLoading, error } = useUsers()
   const users = useMemo(() => formatUsers(rawUsers), [rawUsers])
@@ -823,6 +824,14 @@ export default function DataTable() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function DataTable() {
+  return (
+    <FeatureGate feature="team_management">
+      <DataTableContent />
+    </FeatureGate>
   )
 }
 

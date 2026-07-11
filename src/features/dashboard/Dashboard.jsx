@@ -15,11 +15,12 @@ import RecentActivityFeed from './components/ActivityFeed/RecentActivityFeed'
 import DateRangeFilter from '../../components/common/DateRangeFilter'
 import { trackEvent } from '../analytics/trackEvent'
 import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
+import FeatureGate from '../../components/auth/FeatureGate'
 
 // Module-level set persists across StrictMode unmount/remount to prevent duplicate tracking
 const trackedViewKeys = new Set()
 
-export default function Dashboard() {
+function DashboardContent() {
   const navigate = useNavigate()
   const { user, loading: isAuthLoading } = useSelector((state) => state.auth)
   const { profile } = useSelector((state) => state.profile)
@@ -147,6 +148,14 @@ export default function Dashboard() {
         error={error}
       />
     </div>
+  )
+}
+
+export default function Dashboard() {
+  return (
+    <FeatureGate feature="dashboard">
+      <DashboardContent />
+    </FeatureGate>
   )
 }
 

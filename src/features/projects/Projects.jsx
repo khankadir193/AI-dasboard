@@ -33,8 +33,9 @@ import EditProjectModal from './modals/EditProjectModal'
 
 // Common components
 import ErrorAlert from '../../components/common/ErrorAlert'
+import FeatureGate from '../../components/auth/FeatureGate'
 
-export default function Projects() {
+function ProjectsContent() {
   const dispatch = useDispatch()
   const { user, loading: authLoading } = useSelector((state) => state.auth)
   const { profile, isLoading: profileLoading } = useSelector((state) => state.profile)
@@ -392,5 +393,13 @@ export default function Projects() {
         modalRef={modalRef}
       />
     </div>
+  )
+}
+
+export default function Projects() {
+  return (
+    <FeatureGate feature="projects">
+      <ProjectsContent />
+    </FeatureGate>
   )
 }

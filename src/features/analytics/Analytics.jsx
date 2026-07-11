@@ -8,6 +8,7 @@ import { BarChart3, TrendingUp, Clock, Activity, Loader2, RefreshCw } from 'luci
 import DateRangeFilter from '../../components/common/DateRangeFilter'
 import { useAnalyticsPageData } from './hooks/useAnalyticsPageData'
 import { useAnalyticsSubscription } from '../../hooks/useAnalyticsSubscription'
+import FeatureGate from '../../components/auth/FeatureGate'
 
 // Reusable event label mapping
 const EVENT_LABELS = {
@@ -26,7 +27,7 @@ const EVENT_COLORS = {
   projects_deleted: { bg: 'bg-red-50 dark:bg-red-900/30', bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' }
 }
 
-export default function Analytics() {
+function AnalyticsContent() {
   const { profile } = useSelector((state) => state.profile)
 
   const [dateRange, setDateRange] = useState(() => {
@@ -216,5 +217,13 @@ export default function Analytics() {
       </div>
 
     </div>
+  )
+}
+
+export default function Analytics() {
+  return (
+    <FeatureGate feature="analytics">
+      <AnalyticsContent />
+    </FeatureGate>
   )
 }

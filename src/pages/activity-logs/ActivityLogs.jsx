@@ -11,6 +11,7 @@ import { ROUTES } from '../../lib/constants'
 import clsx from 'clsx'
 import { Clock, Filter, Search, User } from 'lucide-react'
 import { useSelector } from 'react-redux'
+import FeatureGate from '../../components/auth/FeatureGate'
 
 const EVENT_DEFS = {
   projects_created: {
@@ -60,7 +61,7 @@ function safeLower(s) {
   return (s ?? '').toString().toLowerCase()
 }
 
-export default function ActivityLogs() {
+function ActivityLogsContent() {
   const { user } = useSelector((state) => state.auth)
   const { profile } = useSelector((state) => state.profile)
 
@@ -332,6 +333,14 @@ export default function ActivityLogs() {
         ))}
       </div>
     </div>
+  )
+}
+
+export default function ActivityLogs() {
+  return (
+    <FeatureGate feature="activity_logs">
+      <ActivityLogsContent />
+    </FeatureGate>
   )
 }
 
