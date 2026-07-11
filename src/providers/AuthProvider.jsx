@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabaseClient'
 import { setUser, setLoading, setInitialized, clearUser } from '../store/slices/authSlice'
 import { clearProfile, fetchUserProfile } from '../store/slices/profileSlice'
@@ -7,6 +8,7 @@ import { clearTenant } from '../store/slices/tenantSlice'
 import { clearProjects } from '../store/slices/projectsSlice'
 import FullScreenLoader from '../components/common/FullScreenLoader'
 import { trackEvent } from '../features/analytics/trackEvent'
+import { logActivity, ACTIONS, RESOURCE_TYPES } from '../services/activityLogService'
 
 const AUTH_REQUEST_TIMEOUT_MS = 8000
 const PROFILE_RETRY_DELAY_MS = 1500
@@ -25,6 +27,7 @@ const withTimeout = (promise, label) => {
 
 export default function AuthProvider({ children }) {
   const dispatch = useDispatch()
+  const queryClient = useQueryClient()
   const [isInitialized, setIsInitialized] = useState(false)
 
   const didInit = useRef(false)
@@ -48,16 +51,20 @@ export default function AuthProvider({ children }) {
 
   const loginTrackedRef = useRef(false)
   const pendingSignInRef = useRef(false)
+  const profileRecoveryFailedRef = useRef(false)
 
   const attemptProfileFetch = (userId) => {
     profileRetryCountRef.current = 0
     lastFetchedIdRef.current = userId
+    profileRecoveryFailedRef.current = false
     dispatch(fetchUserProfile(userId))
   }
 
   const handleAuthWithProfile = (session) => {
     const incomingUserId = session?.user?.id ?? null
     if (!incomingUserId) return
+
+    if (profileRecoveryFailedRef.current) return
 
     if (incomingUserId === currentUserIdRef.current) {
       if (incomingUserId !== lastFetchedIdRef.current) {
@@ -72,10 +79,9 @@ export default function AuthProvider({ children }) {
             lastFetchedIdRef.current = incomingUserId
             dispatch(fetchUserProfile(incomingUserId))
           }, PROFILE_RETRY_DELAY_MS)
-        } else {
-          profileRetryCountRef.current = 0
+        } else if (!profileRecoveryFailedRef.current) {
+          profileRecoveryFailedRef.current = true
           lastFetchedIdRef.current = incomingUserId
-          dispatch(fetchUserProfile(incomingUserId))
         }
       }
       return
@@ -103,6 +109,8 @@ export default function AuthProvider({ children }) {
     dispatch(clearProfile())
     dispatch(clearTenant())
     dispatch(clearProjects())
+    queryClient.removeQueries({ queryKey: ['subscription'] })
+    queryClient.removeQueries({ queryKey: ['featureFlags'] })
   }
 
   useEffect(() => {
@@ -152,6 +160,8 @@ export default function AuthProvider({ children }) {
         if (!isMounted) return
 
         if (event === 'SIGNED_OUT') {
+          const cid = latestProfileIdRef.current
+          const uid = currentUserIdRef.current
           loginTrackedRef.current = false
           currentUserIdRef.current = null
           lastFetchedIdRef.current = null
@@ -159,6 +169,15 @@ export default function AuthProvider({ children }) {
           if (profileRetryTimerRef.current) {
             clearTimeout(profileRetryTimerRef.current)
             profileRetryTimerRef.current = null
+          }
+          if (cid) {
+            logActivity({
+              companyId: cid,
+              userId: uid,
+              action: ACTIONS.LOGOUT,
+              resourceType: RESOURCE_TYPES.AUTH,
+              description: 'User logged out'
+            })
           }
           void clearSessionState()
           return
@@ -201,6 +220,15 @@ export default function AuthProvider({ children }) {
       companyId: profileInStore.company_id,
       type: 'active_users',
       value: 1
+    })
+
+    logActivity({
+      companyId: profileInStore.company_id,
+      userId: profileInStore.id,
+      action: ACTIONS.LOGIN,
+      resourceType: RESOURCE_TYPES.AUTH,
+      description: 'User logged in',
+      metadata: { role: profileInStore.role }
     })
   }, [profileInStore?.company_id])
 

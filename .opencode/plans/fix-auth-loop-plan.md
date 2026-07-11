@@ -1,45 +1,78 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
-import { useSelector, useDispatch } from 'react-redux'
-import { supabase } from '../lib/supabaseClient'
-import { fetchMyMembership } from '../services/usersService'
-import { fetchUserProfile } from '../store/slices/profileSlice'
-import FullScreenLoader from '../components/common/FullScreenLoader'
-import { reconcileProfile, reconcileMember, verifyProfileExists, verifyMemberExists } from '../features/invitations/services/invitationService'
+# Fix Infinite Auth/Profile Loading Loop
 
-const log = (event, data) => {
-  console.log(`[PrivateRoute] ${event}`, data || '')
+## 1. `src/providers/AuthProvider.jsx` — Stop infinite retry reset
+
+**Add** after line 51: `const profileRecoveryFailedRef = useRef(false)`
+
+**Replace** lines 53-89 with:
+
+```js
+const attemptProfileFetch = (userId) => {
+    profileRetryCountRef.current = 0
+    lastFetchedIdRef.current = userId
+    profileRecoveryFailedRef.current = false
+    dispatch(fetchUserProfile(userId))
 }
 
-export default function PrivateRoute({ children }) {
-  const dispatch = useDispatch()
-  const location = useLocation()
-  const { user, loading, initialized } = useSelector((state) => state.auth)
-  const { profile, isLoading: profileLoading } = useSelector((state) => state.profile)
+const handleAuthWithProfile = (session) => {
+    const incomingUserId = session?.user?.id ?? null
+    if (!incomingUserId) return
 
-  const [membershipChecked, setMembershipChecked] = useState(false)
-  const [accessBlocked, setAccessBlocked] = useState(false)
+    if (profileRecoveryFailedRef.current) return
 
-  const reconcilingRef = useRef(false)
-  const retryCountRef = useRef(0)
-  const timerRef = useRef(null)
-  const recoveryAttemptedRef = useRef(false)
-  const profileLoadedRef = useRef(false)
-  const [recoveryError, setRecoveryError] = useState(null)
-
-  useEffect(() => {
-    if (profile?.company_id) {
-      profileLoadedRef.current = true
+    if (incomingUserId === currentUserIdRef.current) {
+      if (incomingUserId !== lastFetchedIdRef.current) {
+        attemptProfileFetch(incomingUserId)
+      } else if (!latestProfileIdRef.current) {
+        if (profileRetryCountRef.current < MAX_PROFILE_RETRIES) {
+          profileRetryCountRef.current += 1
+          if (profileRetryTimerRef.current) {
+            clearTimeout(profileRetryTimerRef.current)
+          }
+          profileRetryTimerRef.current = setTimeout(() => {
+            lastFetchedIdRef.current = incomingUserId
+            dispatch(fetchUserProfile(incomingUserId))
+          }, PROFILE_RETRY_DELAY_MS)
+        } else if (!profileRecoveryFailedRef.current) {
+          profileRecoveryFailedRef.current = true
+          lastFetchedIdRef.current = incomingUserId
+        }
+      }
+      return
     }
-  }, [profile?.company_id])
 
-  const loadProfile = useCallback(() => {
-    if (!user?.id) return
-    retryCountRef.current += 1
-    dispatch(fetchUserProfile(user.id))
-  }, [dispatch, user?.id])
+    currentUserIdRef.current = incomingUserId
+    dispatch(setUser(session.user))
 
-  useEffect(() => {
+    attemptProfileFetch(incomingUserId)
+}
+```
+
+**Key changes**: `profileRecoveryFailedRef` guard at top. Exhaustion branch (lines 76-80 in original) no longer resets counter to 0 and dispatches — instead sets `profileRecoveryFailedRef = true` and stops.
+
+---
+
+## 2. `src/routes/PrivateRoute.jsx` — Decouple recovery from profile state
+
+**Add** after line 26:
+```js
+const recoveryAttemptedRef = useRef(false)
+const profileLoadedRef = useRef(false)
+const [recoveryError, setRecoveryError] = useState(null)
+```
+
+**Insert** after line 32 (before the recovery effect):
+```js
+useEffect(() => {
+  if (profile?.company_id) {
+    profileLoadedRef.current = true
+  }
+}, [profile?.company_id])
+```
+
+**Replace** lines 34-106 with:
+```js
+useEffect(() => {
     if (!user?.id) return
     if (profileLoadedRef.current) return
     if (recoveryAttemptedRef.current) return
@@ -123,55 +156,10 @@ export default function PrivateRoute({ children }) {
       }
     }
   }, [user?.id])
+```
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    const verifyMembership = async () => {
-      if (!user?.id || !profile?.company_id) {
-        if (!cancelled) {
-          setMembershipChecked(true)
-          setAccessBlocked(false)
-        }
-        return
-      }
-
-      try {
-        const membership = await fetchMyMembership(user.id, profile.company_id)
-        if (cancelled) return
-
-        if (membership && membership.status !== 'active') {
-          await supabase.auth.signOut()
-          setAccessBlocked(true)
-        } else {
-          setAccessBlocked(false)
-        }
-      } catch (err) {
-        if (!cancelled) setAccessBlocked(true)
-      } finally {
-        if (!cancelled) setMembershipChecked(true)
-      }
-    }
-
-    if (initialized && !loading && !profileLoading && user?.id && profile?.company_id) {
-      setMembershipChecked(false)
-      verifyMembership()
-    }
-
-    return () => {
-      cancelled = true
-    }
-  }, [initialized, loading, profileLoading, user?.id, profile?.company_id])
-
+**Replace** lines 156-186 with error handling:
+```js
   if (!initialized) {
     return <FullScreenLoader message="Initializing workspace..." />
   }
@@ -217,15 +205,25 @@ export default function PrivateRoute({ children }) {
   }
 
   return children
-}
+```
 
-function extractInviteToken(location) {
-  const match = location.pathname?.match?.(/\/invite\/([^/]+)/)
-  if (match?.[1]) return decodeURIComponent(match[1])
-  try {
-    const params = new URLSearchParams(location.search)
-    const t = params.get('token') || params.get('inviteToken') || params.get('t')
-    if (t) return t
-  } catch {}
-  return null
-}
+**Key changes**: Effect deps changed from `[user?.id, hasProfile, profileLoading, dispatch, location, loadProfile]` to just `[user?.id]`. `recoveryAttemptedRef` prevents re-execution. Retries are bounded (3 max). Error boundary shown on failure instead of infinite loading.
+
+---
+
+## 3. `src/hooks/useTenantAuth.js` — Decouple fetch from profile state
+
+**Add** after line 12: `const profileFetchAttemptedRef = useRef(false)`
+
+**Replace** lines 14-19 with:
+```js
+  useEffect(() => {
+    if (!isAuthenticated || !user) return
+    if (profileFetchAttemptedRef.current) return
+
+    profileFetchAttemptedRef.current = true
+    dispatch(fetchUserProfile(user.id))
+  }, [isAuthenticated, user, dispatch])
+```
+
+**Key changes**: Removed `profile` from deps. Added `profileFetchAttemptedRef` guard to prevent re-fetching on re-renders. Effect only depends on auth state, which is stable after initial load.

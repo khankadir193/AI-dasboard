@@ -99,7 +99,7 @@ export default function Analytics() {
                 <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="events" stroke="#3b82f6" strokeWidth={2} dot={false} name="Events" />
+                <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} dot={false} name="Events" />
               </LineChart>
             </ResponsiveContainer>
           ) : (

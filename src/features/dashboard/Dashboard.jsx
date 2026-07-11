@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { Loader2 } from 'lucide-react'
@@ -14,6 +14,10 @@ import ProjectStatusChart from './components/Charts/ProjectStatusChart'
 import RecentActivityFeed from './components/ActivityFeed/RecentActivityFeed'
 import DateRangeFilter from '../../components/common/DateRangeFilter'
 import { trackEvent } from '../analytics/trackEvent'
+import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
+
+// Module-level set persists across StrictMode unmount/remount to prevent duplicate tracking
+const trackedViewKeys = new Set()
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -35,8 +39,7 @@ export default function Dashboard() {
   const { data: analyticsData, isLoading, error, refetch } = useDashboardAnalytics(dateRange)
   const { trialInfo = { isLoading: false, trialEnd: null, isExpired: false, daysLeft: 0 } } = useTrial()
   const { pathname } = useLocation()
-
-  const dashboardTrackedRef = useRef(false)
+  const locationKey = useLocation().key
 
   useAnalyticsSubscription(profile?.company_id)
 
@@ -46,18 +49,33 @@ export default function Dashboard() {
     }
   }, [isAuthLoading, user, navigate])
 
-  // Track dashboard view on every route entry (deduped against StrictMode double-mount)
+  // Track dashboard view on every route entry (StrictMode-safe via module-level set keyed by location key)
   useEffect(() => {
     if (!profile?.company_id) return
-    if (dashboardTrackedRef.current) return
-    dashboardTrackedRef.current = true
+
+    const viewKey = `${profile.company_id}:${locationKey}`
+    if (trackedViewKeys.has(viewKey)) return
+    trackedViewKeys.add(viewKey)
+
+    // Cap set size to prevent memory leak in long-lived SPAs
+    if (trackedViewKeys.size > 100) {
+      trackedViewKeys.clear()
+    }
 
     trackEvent({
       companyId: profile.company_id,
       type: 'dashboard_view',
       value: 1
     })
-  }, [profile?.company_id])
+
+    logActivity({
+      companyId: profile.company_id,
+      userId: profile.id,
+      action: ACTIONS.DASHBOARD_VIEW,
+      resourceType: RESOURCE_TYPES.DASHBOARD,
+      description: 'Dashboard viewed'
+    })
+  }, [profile?.company_id, locationKey])
 
   if (isLoading) {
     return (
@@ -80,12 +98,21 @@ export default function Dashboard() {
           className={`rounded-xl border px-4 py-3 ${
             trialInfo.isExpired
               ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300'
-              : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300'
+              : trialInfo.daysLeft <= 3
+                ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300'
+                : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300'
           }`}
         >
-          {trialInfo.isExpired
-            ? 'Your 30-day trial has ended. Upgrade to keep full access.'
-            : `Trial active: ${trialInfo.daysLeft} day${trialInfo.daysLeft === 1 ? '' : 's'} remaining.`}
+          {trialInfo.isExpired ? (
+            <div className="flex items-center justify-between">
+              <span>Your trial has expired. Upgrade now.</span>
+              <button onClick={() => navigate('/billing')} className="btn-primary text-sm ml-4 flex-none">
+                Upgrade
+              </button>
+            </div>
+          ) : (
+            `Trial active: ${trialInfo.daysLeft} day${trialInfo.daysLeft === 1 ? '' : 's'} remaining.`
+          )}
         </div>
       )}
 

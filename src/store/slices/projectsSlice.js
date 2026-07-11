@@ -6,6 +6,7 @@ import {
   updateProject as updateProjectApi
 } from '../../services/projectsService'
 import { trackEvent } from '../../features/analytics/trackEvent'
+import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
 
 // ============================
 // Async Thunks
@@ -40,12 +41,23 @@ export const createProject = createAsyncThunk(
       // Track analytics after successful project creation
       const state = getState()
       const companyId = state.profile?.profile?.company_id
+      const userId = state.profile?.profile?.id
 
       if (companyId) {
         trackEvent({
           companyId,
           type: 'projects_created',
           value: 1
+        })
+
+        logActivity({
+          companyId,
+          userId,
+          action: ACTIONS.PROJECT_CREATE,
+          resourceType: RESOURCE_TYPES.PROJECT,
+          resourceId: data?.id,
+          description: `Project "${data?.name || ''}" created`,
+          metadata: { projectName: data?.name }
         })
       }
 
@@ -68,12 +80,23 @@ export const deleteProject = createAsyncThunk(
       // Track analytics after successful project deletion
       const state = getState()
       const companyId = state.profile?.profile?.company_id
+      const userId = state.profile?.profile?.id
 
       if (companyId) {
         trackEvent({
           companyId,
           type: 'projects_deleted',
           value: 1
+        })
+
+        logActivity({
+          companyId,
+          userId,
+          action: ACTIONS.PROJECT_DELETE,
+          resourceType: RESOURCE_TYPES.PROJECT,
+          resourceId: projectId,
+          description: `Project "${deletedProject?.name || ''}" deleted`,
+          metadata: { projectName: deletedProject?.name }
         })
       }
 
@@ -96,12 +119,23 @@ export const updateProject = createAsyncThunk(
       // Track analytics after successful project update
       const state = getState()
       const companyId = state.profile?.profile?.company_id
+      const userId = state.profile?.profile?.id
 
       if (companyId) {
         trackEvent({
           companyId,
           type: 'projects_updated',
           value: 1
+        })
+
+        logActivity({
+          companyId,
+          userId,
+          action: ACTIONS.PROJECT_UPDATE,
+          resourceType: RESOURCE_TYPES.PROJECT,
+          resourceId: projectId,
+          description: `Project "${data?.name || ''}" updated`,
+          metadata: { updates }
         })
       }
 

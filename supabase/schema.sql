@@ -7,7 +7,10 @@ CREATE TABLE IF NOT EXISTS companies (
     name TEXT NOT NULL,
     domain TEXT UNIQUE,
     settings JSONB DEFAULT '{}',
-    subscription_plan TEXT DEFAULT 'free',
+    subscription_plan TEXT DEFAULT 'trial',
+    trial_started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '30 days'),
+    subscription_status TEXT DEFAULT 'active',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -31,7 +34,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS analytics_data (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
-    metric_type TEXT NOT NULL CHECK (metric_type IN ('revenue', 'expenses', 'users', 'active_users', 'projects', 'projects_created', 'projects_deleted', 'conversion_rate', 'orders', 'traffic', 'engagement', 'dashboard_view')),
+    metric_type TEXT NOT NULL CHECK (metric_type IN ('revenue', 'expenses', 'users', 'active_users', 'projects', 'projects_created', 'projects_deleted', 'projects_updated', 'conversion_rate', 'orders', 'traffic', 'engagement', 'dashboard_view')),
     metric_value NUMERIC NOT NULL,
     metric_date DATE NOT NULL DEFAULT CURRENT_DATE,
     metadata JSONB DEFAULT '{}',
@@ -349,8 +352,8 @@ BEGIN
     SPLIT_PART(NEW.email, '@', 1) || ' Company'
   );
 
-  INSERT INTO public.companies (name)
-  VALUES (company_name)
+  INSERT INTO public.companies (name, subscription_plan, trial_started_at, trial_ends_at, subscription_status)
+  VALUES (company_name, 'trial', NOW(), NOW() + INTERVAL '30 days', 'active')
   RETURNING id INTO company_uuid;
 
   INSERT INTO public.profiles (id, company_id, role, email)
@@ -387,7 +390,7 @@ CREATE POLICY "Users can view their company" ON companies
 ALTER TABLE analytics_data DROP CONSTRAINT IF EXISTS analytics_data_metric_type_check;
 
 ALTER TABLE analytics_data ADD CONSTRAINT analytics_data_metric_type_check
-  CHECK (metric_type IN ('revenue', 'expenses', 'users', 'active_users', 'projects', 'projects_created', 'projects_deleted', 'conversion_rate', 'orders', 'traffic', 'engagement', 'dashboard_view'));
+  CHECK (metric_type IN ('revenue', 'expenses', 'users', 'active_users', 'projects', 'projects_created', 'projects_deleted', 'projects_updated', 'conversion_rate', 'orders', 'traffic', 'engagement', 'dashboard_view'));
 
 -- =====================================================
 -- CLEANUP: Remove mock/sample data from analytics_data
@@ -403,3 +406,88 @@ WHERE metadata->>'source' IN ('mock', 'sample', 'demo')
 -- DELETE FROM analytics_data
 -- WHERE metric_value > 10000
 -- AND metadata->>'isReal' IS NULL;
+
+-- =====================================================
+-- FEATURE FLAGS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS feature_flags (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
+    feature_key TEXT NOT NULL,
+    enabled BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(company_id, feature_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_feature_flags_company ON feature_flags(company_id);
+
+ALTER TABLE feature_flags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their company feature flags" ON feature_flags
+    FOR SELECT USING (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Admins can manage feature flags" ON feature_flags
+    FOR INSERT WITH CHECK (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    );
+
+CREATE POLICY "Admins can update feature flags" ON feature_flags
+    FOR UPDATE USING (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    );
+
+CREATE POLICY "Admins can delete feature flags" ON feature_flags
+    FOR DELETE USING (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    );
+
+-- =====================================================
+-- ACTIVITY LOGS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT,
+    description TEXT NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_company ON activity_logs(company_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs(action);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_resource ON activity_logs(resource_type, resource_id);
+
+ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their company activity logs" ON activity_logs
+    FOR SELECT USING (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Users can insert activity logs" ON activity_logs
+    FOR INSERT WITH CHECK (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+-- Enable Realtime for activity_logs (for potential future live updates)
+ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS activity_logs;
+
+-- =====================================================
+-- FIX: Grant table access to authenticated role
+-- Without these GRANTs, RLS policies exist but the
+-- authenticated role lacks table-level permissions,
+-- causing "permission denied for table" errors.
+-- Pattern matches public.company_members (line 101).
+-- =====================================================
+
+GRANT SELECT, INSERT, UPDATE ON public.feature_flags TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.activity_logs TO authenticated;

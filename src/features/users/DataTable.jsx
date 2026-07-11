@@ -18,6 +18,7 @@ import {
   buildInviteUrl,
   getInviteToken
 } from '../../services/invitesService'
+import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
 
 import { supabase } from '../../lib/supabaseClient'
 
@@ -340,6 +341,16 @@ export default function DataTable() {
       if (!pendingRow?.id) {
         throw new Error('Invite id missing after creation')
       }
+
+      logActivity({
+        companyId,
+        userId: profile?.id,
+        action: ACTIONS.INVITE_SEND,
+        resourceType: RESOURCE_TYPES.INVITE,
+        resourceId: pendingRow.id,
+        description: `Invitation sent to ${inviteEmail.trim()}`,
+        metadata: { email: inviteEmail.trim(), role: dbRole }
+      })
 
       try {
         await sendInviteEmail(pendingRow.id)

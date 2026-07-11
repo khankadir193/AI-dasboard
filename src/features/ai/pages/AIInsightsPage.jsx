@@ -8,8 +8,9 @@ import useConversations from '../hooks/useConversations';
 import useMessages from '../hooks/useMessages';
 import { ANALYSIS_TYPES } from '../utils/analysisTypes';
 import { useMemo, useEffect, useState, useRef } from 'react';
+import FeatureGate from '../../../components/auth/FeatureGate';
 
-export default function AIInsightsPage() {
+function AIInsightsContent() {
     const [pageLoading, setPageLoading] = useState(true);
     const initialLoadDone = useRef(false);
     const historyLoadStarted = useRef(false);
@@ -157,5 +158,13 @@ export default function AIInsightsPage() {
                 />
             }
         />
+    );
+}
+
+export default function AIInsightsPage() {
+    return (
+        <FeatureGate feature="ai_insights">
+            <AIInsightsContent />
+        </FeatureGate>
     );
 }

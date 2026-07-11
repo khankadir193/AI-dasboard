@@ -8,6 +8,8 @@ import Projects from '../features/projects/Projects.jsx'
 import Settings from '../features/organization/Settings.jsx'
 import ActivityLogs from '../pages/activity-logs/ActivityLogs.jsx'
 import Notifications from '../pages/notifications/Notifications.jsx'
+import AuditLogs from '../pages/audit-logs/AuditLogs.jsx'
+import Billing from '../pages/billing/Billing.jsx'
 import SignIn from '../features/auth/SignIn.jsx'
 import SignUp from '../features/auth/Signup.jsx'
 import AuthProvider from '../providers/AuthProvider'
@@ -33,7 +35,9 @@ export default function App() {
           <Route path="/projects" element={<Projects />} />
           <Route path="/activity-logs" element={<ActivityLogs />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/audit-logs" element={<AuditLogs />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/billing" element={<Billing />} />
         </Route>
         <Route path="/invite/:token" element={<AcceptInvitePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

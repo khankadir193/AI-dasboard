@@ -31,7 +31,11 @@ export async function fetchProfile(userId) {
           *,
           companies:company_id (
             id,
-            name
+            name,
+            subscription_plan,
+            subscription_status,
+            trial_started_at,
+            trial_ends_at
           )
         `)
         .eq('id', userId)

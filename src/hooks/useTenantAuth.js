@@ -10,13 +10,15 @@ export function useTenantAuth() {
   const { profile } = useSelector((state) => state.profile)
   const { currentTenant } = useSelector((state) => state.tenant)
   const lastCompanyIdRef = useRef(null)
+  const profileFetchAttemptedRef = useRef(false)
 
   useEffect(() => {
-    if (isAuthenticated && user && !profile) {
-      // Fetch user profile when authenticated but profile not loaded
-      dispatch(fetchUserProfile(user.id))
-    }
-  }, [isAuthenticated, user, profile, dispatch])
+    if (!isAuthenticated || !user) return
+    if (profileFetchAttemptedRef.current) return
+
+    profileFetchAttemptedRef.current = true
+    dispatch(fetchUserProfile(user.id))
+  }, [isAuthenticated, user, dispatch])
 
   useEffect(() => {
     const currentCompanyId = profile?.company_id ?? null

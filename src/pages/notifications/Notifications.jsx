@@ -6,6 +6,7 @@ import Spinner from '../../components/ui/Spinner'
 import { Card } from '../../components/ui/Card'
 import { Badge, Button, Input } from '../../components/ui'
 import { Bell, Clock, CheckCircle2, Dot, Filter, Search, User } from 'lucide-react'
+import FeatureGate from '../../components/auth/FeatureGate'
 
 const EVENT_DEFS = {
   projects_created: {
@@ -59,7 +60,7 @@ function getNotificationId(ev) {
 }
 
 
-export default function Notifications() {
+function NotificationsContent() {
   const { user } = useSelector((state) => state.auth)
   const { profile } = useSelector((state) => state.profile)
 
@@ -376,3 +377,10 @@ export default function Notifications() {
   )
 }
 
+export default function Notifications() {
+  return (
+    <FeatureGate feature="notifications">
+      <NotificationsContent />
+    </FeatureGate>
+  )
+}
