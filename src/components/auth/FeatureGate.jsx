@@ -29,7 +29,7 @@ function TrialExpiredUpgradeScreen() {
   return (
     <div className="card p-8 text-center max-w-xl mx-auto">
       <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-        Trial expired
+        Trial Expired
       </h2>
       <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
         Your trial has expired. Upgrade to continue using premium features.

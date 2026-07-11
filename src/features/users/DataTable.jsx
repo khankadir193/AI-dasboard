@@ -55,6 +55,8 @@ import Modal from '../../components/common/Modal'
 import Input from '../../components/ui/Input'
 import Button from '../../components/ui/Button'
 import FeatureGate from '../../components/auth/FeatureGate'
+import { useSubscription } from '../../services/subscriptionService'
+import { canPerformWriteAction } from '../../utils/subscriptionAccess'
 
 const PENDING_STATUS = 'Pending'
 
@@ -66,9 +68,11 @@ function DataTableContent() {
   const currentUserId = useSelector(state => state.auth.user?.id)
   const currentRole = profile?.role
   const currentRoleKey = String(currentRole || '').toLowerCase().trim()
-  const canInvite = currentRoleKey === 'admin'
-  const isAdmin = currentRoleKey === 'admin'
   const companyId = profile?.company_id
+  const { data: subscription } = useSubscription(companyId)
+  const canWrite = canPerformWriteAction(subscription)
+  const canInvite = currentRoleKey === 'admin' && canWrite
+  const isAdmin = currentRoleKey === 'admin'
 
 
   const [viewUser, setViewUser] = useState(null)
@@ -191,6 +195,11 @@ function DataTableContent() {
   }
 
   const handleEditRoleOpen = (user) => {
+    if (!canWrite) {
+      showToast('Subscription required. Upgrade to edit member roles.')
+      setActionMenuOpen(null)
+      return
+    }
     if (!canEditTargetMember(currentRoleKey, user?.roleKey || user?.role)) {
       showToast('You do not have permission to edit this member')
       setActionMenuOpen(null)
@@ -222,6 +231,11 @@ function DataTableContent() {
   }
 
   const handleToggleStatusOpen = (user) => {
+    if (!canWrite) {
+      showToast('Subscription required. Upgrade to manage member status.')
+      setActionMenuOpen(null)
+      return
+    }
     if (user?.id === currentUserId) {
       showToast('You cannot suspend your own account')
       setActionMenuOpen(null)
@@ -266,6 +280,11 @@ function DataTableContent() {
   }
 
   const handleDeleteUserOpen = (user) => {
+    if (!canWrite) {
+      showToast('Subscription required. Upgrade to remove members.')
+      setActionMenuOpen(null)
+      return
+    }
     if (user?.id === currentUserId) {
       showToast('You cannot remove your own account')
       setActionMenuOpen(null)
@@ -397,14 +416,18 @@ function DataTableContent() {
           <button
             type="button"
             onClick={() => {
-              if (!canInvite) {
+              if (!canWrite) {
+                showToast('Subscription required. Upgrade to invite members.')
+                return
+              }
+              if (currentRoleKey !== 'admin') {
                 showToast('Only admins can invite members')
                 return
               }
               setInviteOpen(true)
             }}
             disabled={!canInvite}
-            title={!canInvite ? 'Only admins can invite users' : undefined}
+            title={!canWrite ? 'Subscription required. Upgrade to Pro.' : (!canInvite ? 'Only admins can invite users' : undefined)}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
               canInvite
                 ? 'bg-blue-600 hover:bg-blue-700 text-white'

@@ -4,6 +4,8 @@ import { Plus, X, RefreshCw } from 'lucide-react'
 import PermissionButton from '../../components/auth/PermissionButton.jsx'
 import { usePermission } from '../../hooks/usePermission'
 import { PERMISSIONS } from '../../utils/permissions'
+import { useSubscription } from '../../services/subscriptionService'
+import { canPerformWriteAction } from '../../utils/subscriptionAccess'
 import {
   fetchProjects,
   createProject,
@@ -66,9 +68,16 @@ function ProjectsContent() {
   const companyId = profile?.company_id
 
   // Permission checks
-  const { isAllowed: canCreate } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_CREATE })
-  const { isAllowed: canUpdate, tooltip: updateTooltip } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_UPDATE })
-  const { isAllowed: canDelete, tooltip: deleteTooltip } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_DELETE })
+  const { isAllowed: canCreateByRole } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_CREATE })
+  const { isAllowed: canUpdateByRole, tooltip: updateTooltip } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_UPDATE })
+  const { isAllowed: canDeleteByRole, tooltip: deleteTooltip } = usePermission({ requiredPermission: PERMISSIONS.PROJECTS_DELETE })
+
+  // Subscription write check — layered on top of role permissions
+  const { data: subscription } = useSubscription(companyId)
+  const canWrite = canPerformWriteAction(subscription)
+  const canCreate = canCreateByRole && canWrite
+  const canUpdate = canUpdateByRole && canWrite
+  const canDelete = canDeleteByRole && canWrite
 
   // ============================
   // Fetch projects on mount / when auth and profile ready
