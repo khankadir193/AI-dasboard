@@ -36,6 +36,10 @@ const PermissionButton = forwardRef((
 
   const isDisabled = disabled || loading || permissionLoading || !isAllowed
 
+  // usePermission only sets tooltip when role blocks; when external disabled prop
+  // blocks (e.g. subscription write check), propagate tooltipText here.
+  const displayTooltip = tooltip || (disabled && tooltipText ? tooltipText : undefined)
+
   const handleClick = useCallback(
     (e) => {
       if (isDisabled) {
@@ -62,11 +66,11 @@ const PermissionButton = forwardRef((
 
   // Wrap disabled buttons in a span so the tooltip still shows on hover
   // (disabled elements don't fire mouse events in some browsers)
-  if (isDisabled && tooltip) {
+  if (isDisabled && displayTooltip) {
     return (
       <span
         className="inline-block"
-        title={tooltip}
+        title={displayTooltip}
         style={{ cursor: 'not-allowed' }}
       >
         {button}
