@@ -91,18 +91,31 @@ export async function handleVerifyPayment(req, res) {
       return res.status(500).json({ error: 'Failed to update subscription' })
     }
 
-    const { error: txError } = await supabase.from('billing_transactions').insert({
-      company_id: companyId,
-      amount: 99900,
-      currency: 'INR',
-      status: 'succeeded',
-      payment_provider: 'razorpay',
-      provider_payment_id: razorpay_payment_id,
-      provider_subscription_id: razorpay_order_id,
-    })
+    console.log('[Billing] creating billing transaction for company:', companyId, 'payment:', razorpay_payment_id)
 
-    if (txError) {
-      console.error('[Billing] verify-payment transaction insert error:', txError)
+    const { data: existingTx } = await supabase
+      .from('billing_transactions')
+      .select('id')
+      .eq('provider_payment_id', razorpay_payment_id)
+      .maybeSingle()
+
+    if (!existingTx) {
+      const { error: txError } = await supabase.from('billing_transactions').insert({
+        company_id: companyId,
+        amount: 99900,
+        currency: 'INR',
+        status: 'succeeded',
+        payment_provider: 'razorpay',
+        provider_payment_id: razorpay_payment_id,
+        provider_subscription_id: razorpay_order_id,
+      })
+
+      if (txError) {
+        console.error('[Billing] billing transaction insert failed:', txError)
+        return res.status(500).json({ error: 'Failed to record payment transaction' })
+      }
+    } else {
+      console.log('[Billing] duplicate transaction skipped, payment already recorded:', razorpay_payment_id)
     }
 
     return res.status(200).json({ success: true, company })
