@@ -129,7 +129,7 @@ export default function Billing() {
 
       <div className="card p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Current Plan</h2>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Plan</p>
             <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
@@ -154,6 +154,12 @@ export default function Billing() {
                   : plan !== 'trial'
                     ? formatDate(subscription?.current_period_end)
                     : 'Not applicable'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Trial End Date</p>
+            <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+              {isLoading ? 'Loading...' : subscription?.trial_ends_at ? formatDate(subscription.trial_ends_at) : 'N/A'}
             </p>
           </div>
         </div>
