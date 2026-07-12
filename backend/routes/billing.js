@@ -19,6 +19,8 @@ export async function handleCreateOrder(req, res) {
       return res.status(400).json({ error: 'companyId is required' })
     }
 
+    console.log('[Billing] create-order requested for company:', companyId)
+
     const razorpay = getRazorpay()
 
     const order = await razorpay.orders.create({
@@ -27,6 +29,8 @@ export async function handleCreateOrder(req, res) {
       receipt: companyId,
       notes: { company_id: companyId },
     })
+
+    console.log('[Billing] Razorpay order created:', order.id)
 
     return res.status(200).json({
       orderId: order.id,
@@ -58,13 +62,15 @@ export async function handleVerifyPayment(req, res) {
       .update(body)
       .digest('hex')
 
-    if (expectedSignature !== razorpay_signature) {
-      return res.status(400).json({ error: 'Invalid payment signature' })
-    }
+      if (expectedSignature !== razorpay_signature) {
+        return res.status(400).json({ error: 'Invalid payment signature' })
+      }
 
-    const now = new Date()
-    const periodEnd = new Date(now)
-    periodEnd.setDate(periodEnd.getDate() + 30)
+      console.log('[Billing] payment verified for company:', companyId, 'payment:', razorpay_payment_id)
+
+      const now = new Date()
+      const periodEnd = new Date(now)
+      periodEnd.setDate(periodEnd.getDate() + 30)
 
     const { data: company, error: updateError } = await supabase
       .from('companies')
