@@ -1,11 +1,6 @@
 import Razorpay from 'razorpay'
 import crypto from 'crypto'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import supabase from '../lib/supabaseAdmin.js'
 
 function getRazorpay() {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
