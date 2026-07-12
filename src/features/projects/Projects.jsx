@@ -79,6 +79,14 @@ function ProjectsContent() {
   const canUpdate = canUpdateByRole && canWrite
   const canDelete = canDeleteByRole && canWrite
 
+  // Subscription-aware tooltips override role tooltips when write is blocked
+  const effectiveUpdateTooltip = !canWrite && canUpdateByRole
+    ? 'Upgrade to Pro to modify projects.'
+    : updateTooltip
+  const effectiveDeleteTooltip = !canWrite && canDeleteByRole
+    ? 'Upgrade to Pro to manage project lifecycle.'
+    : deleteTooltip
+
   // ============================
   // Fetch projects on mount / when auth and profile ready
   // ============================
@@ -341,6 +349,8 @@ function ProjectsContent() {
           requiredPermission={PERMISSIONS.PROJECTS_CREATE}
           variant="primary"
           className="flex items-center gap-2"
+          disabled={!canWrite}
+          tooltipText={!canWrite ? 'Upgrade to Pro to create new projects.' : undefined}
         >
           <Plus className="h-4 w-4" />
           Add Project
@@ -370,8 +380,8 @@ function ProjectsContent() {
         onDelete={handleDeleteProject}
         canUpdate={canUpdate}
         canDelete={canDelete}
-        updateTooltip={updateTooltip}
-        deleteTooltip={deleteTooltip}
+        updateTooltip={effectiveUpdateTooltip}
+        deleteTooltip={effectiveDeleteTooltip}
         pagination={pagination}
         onPageChange={handlePageChange}
         changingPage={changingPage}
