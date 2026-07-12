@@ -3,12 +3,12 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerHealthRoutes } from './routes/health.js';
+import { registerBillingRoutes } from './routes/billing.js';
+import { registerWebhookRoutes } from './routes/webhooks.js';
 
 // Load environment variables from .env file
 const result = dotenv.config();
-// console.log('DOTENV RESULT:', result);
-// console.log('CURRENT DIR:', process.cwd());
-// console.log('GROQ KEY:', process.env.GROQ_API_KEY);
+
 // Validate required environment variables
 if (!process.env.GROQ_API_KEY) {
   console.error('ERROR: GROQ_API_KEY environment variable is required');
@@ -18,13 +18,23 @@ if (!process.env.GROQ_API_KEY) {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// Capture raw body for webhook signature verification before JSON parsing
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf.toString()
+    },
+  })
+)
+
+// CORS
 app.use(cors({ origin: 'http://localhost:5173' }));
-app.use(express.json());
 
 // Register routes
 registerChatRoutes(app);
 registerHealthRoutes(app);
+registerBillingRoutes(app);
+registerWebhookRoutes(app);
 
 app.listen(PORT, () => {
   // Backend running silently

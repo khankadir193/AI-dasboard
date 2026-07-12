@@ -1,5 +1,7 @@
+import { useState, useCallback } from 'react'
 import { useSelector } from 'react-redux'
 import { useSubscription } from '../../services/subscriptionService'
+import { useCreateOrder, useVerifyPayment } from '../../hooks/useBilling'
 import { getTrialDaysRemaining, isTrialExpired } from '../../utils/subscriptionAccess'
 
 const PRO_FEATURES = [
@@ -20,6 +22,12 @@ const PLAN_LABELS = {
   trial: 'Trial',
   pro: 'Pro',
   enterprise: 'Enterprise',
+}
+
+const STATUS_LABELS = {
+  active: 'Active',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
 }
 
 function formatDate(value) {
@@ -51,10 +59,64 @@ export default function Billing() {
 
   const { data: subscription, isLoading, isError } = useSubscription(companyId)
 
+  const createOrderMut = useCreateOrder()
+  const verifyPaymentMut = useVerifyPayment()
+
+  const [upgradeError, setUpgradeError] = useState(null)
+
   const plan = subscription?.subscription_plan || 'trial'
+  const status = subscription?.subscription_status || 'active'
   const planLabel = PLAN_LABELS[plan] || 'Trial'
+  const statusLabel = STATUS_LABELS[status] || status
   const daysRemaining = getTrialDaysRemaining(subscription)
   const expired = isTrialExpired(subscription)
+
+  const handleUpgrade = useCallback(async () => {
+    if (!companyId) return
+    setUpgradeError(null)
+
+    try {
+      const { orderId, amount, currency } = await createOrderMut.mutateAsync(companyId)
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        order_id: orderId,
+        name: 'InsightAI',
+        description: 'Pro Plan - ₹999/month',
+        currency: currency,
+        amount: amount,
+        prefill: {},
+        theme: { color: '#2563eb' },
+        handler: async function (response) {
+          try {
+            await verifyPaymentMut.mutateAsync({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              companyId,
+            })
+          } catch {
+            setUpgradeError('Payment was processed but verification failed. Please contact support.')
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            // User closed the Razorpay modal without completing payment
+          },
+        },
+      }
+
+      const razorpay = new window.Razorpay(options)
+      razorpay.on('payment.failed', function () {
+        setUpgradeError('Payment failed. Please try again.')
+      })
+      razorpay.open()
+    } catch (err) {
+      setUpgradeError(err.message || 'Failed to initiate upgrade. Please try again.')
+    }
+  }, [companyId, createOrderMut, verifyPaymentMut])
+
+  const isProcessing = createOrderMut.isPending || verifyPaymentMut.isPending
 
   return (
     <div className="space-y-6">
@@ -75,15 +137,23 @@ export default function Billing() {
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Trial Days Remaining</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Status</p>
             <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
-              {plan === 'trial' && daysRemaining !== null ? daysRemaining : 'Not applicable'}
+              {isLoading ? 'Loading...' : statusLabel}
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Trial End Date</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+              {plan === 'trial' ? 'Trial Days Remaining' : 'Next Billing Date'}
+            </p>
             <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
-              {plan === 'trial' ? formatDate(subscription?.trial_ends_at) : 'Not applicable'}
+              {isLoading
+                ? 'Loading...'
+                : plan === 'trial' && daysRemaining !== null
+                  ? daysRemaining
+                  : plan !== 'trial'
+                    ? formatDate(subscription?.current_period_end)
+                    : 'Not applicable'}
             </p>
           </div>
         </div>
@@ -105,6 +175,18 @@ export default function Billing() {
           {expired
             ? 'Your trial has expired. Choose a plan to continue using premium features.'
             : `Trial active: ${daysRemaining ?? 0} day${daysRemaining === 1 ? '' : 's'} remaining.`}
+        </div>
+      )}
+
+      {upgradeError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+          {upgradeError}
+        </div>
+      )}
+
+      {isProcessing && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300">
+          {createOrderMut.isPending ? 'Setting up checkout...' : 'Verifying payment...'}
         </div>
       )}
 
@@ -142,10 +224,11 @@ export default function Billing() {
             <p className="mt-4 text-sm text-blue-600 font-medium">Your current plan</p>
           ) : (
             <button
-              onClick={() => window.location.href = 'mailto:sales@insightai.com?subject=Upgrade to Pro'}
-              className="btn-primary mt-4 w-full text-center"
+              onClick={handleUpgrade}
+              disabled={isProcessing}
+              className="btn-primary mt-4 w-full text-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Upgrade Now
+              {createOrderMut.isPending ? 'Processing...' : 'Upgrade Now'}
             </button>
           )}
         </div>
@@ -175,4 +258,3 @@ export default function Billing() {
     </div>
   )
 }
-

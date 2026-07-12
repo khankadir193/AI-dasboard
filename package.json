@@ -25,6 +25,7 @@
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.344.0",
     "openai": "^4.104.0",
+    "razorpay": "^2.9.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^10.1.0",

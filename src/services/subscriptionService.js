@@ -6,7 +6,7 @@ export async function fetchSubscriptionFromDb(companyId) {
 
   const { data, error } = await supabase
     .from('companies')
-    .select('id, name, subscription_plan, trial_started_at, trial_ends_at, subscription_status')
+    .select('id, name, subscription_plan, trial_started_at, trial_ends_at, subscription_status, payment_provider, provider_subscription_id, current_period_start, current_period_end')
     .eq('id', companyId)
     .maybeSingle()
 
