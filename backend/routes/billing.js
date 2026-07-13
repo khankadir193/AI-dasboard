@@ -136,7 +136,7 @@ export async function handleVerifyPayment(req, res) {
       .maybeSingle()
 
     if (!existingTx) {
-      const { error: txError } = await supabase.from('billing_transactions').insert({
+      const insertPayload = {
         company_id: companyId,
         amount: 99900,
         currency: 'INR',
@@ -144,24 +144,56 @@ export async function handleVerifyPayment(req, res) {
         payment_provider: 'razorpay',
         provider_payment_id: razorpay_payment_id,
         provider_subscription_id: razorpay_order_id,
-      })
-
-      if (txError) {
-        console.error('[Billing] transaction insert failed:', {
-          companyId,
-          paymentId: razorpay_payment_id,
-          message: txError.message,
-          details: txError.details,
-          code: txError.code,
-        })
-        return res.status(500).json({
-          error: 'Failed to record payment transaction',
-          details: txError.message,
-          code: txError.code,
-        })
       }
 
-      console.log('[Billing] transaction recorded:', { companyId, paymentId: razorpay_payment_id })
+      console.log('[Billing] inserting transaction payload:', JSON.stringify(insertPayload, null, 2))
+
+      const result = await supabase.from('billing_transactions').insert(insertPayload).select()
+      console.log('[Billing] insert result:', JSON.stringify(result, null, 2))
+
+      if (result.error) {
+        const isSchemaError = result.error.code === '42703' || /column.*does not exist/i.test(result.error.message)
+
+        if (isSchemaError) {
+          console.error('[Billing] PostgREST schema cache stale — refreshing...')
+
+          const { error: reloadError } = await supabase.rpc('pgrst_reload')
+
+          if (reloadError) {
+            console.error('[Billing] pgrst_reload failed:', JSON.stringify(reloadError, null, 2))
+          } else {
+            console.log('[Billing] PostgREST schema cache refreshed')
+          }
+
+          console.log('[Billing] retrying insert with full payload...')
+          const retryResult = await supabase.from('billing_transactions').insert(insertPayload).select()
+          console.log('[Billing] retry result:', JSON.stringify(retryResult, null, 2))
+
+          if (retryResult.error) {
+            console.error('[Billing] retry insert failed — full error:', JSON.stringify(retryResult.error, null, 2))
+            return res.status(500).json({
+              error: 'Failed to record payment transaction',
+              details: retryResult.error.message,
+              code: retryResult.error.code,
+            })
+          }
+
+          console.log('[Billing] transaction recorded after schema refresh:', {
+            companyId,
+            paymentId: razorpay_payment_id,
+            data: retryResult.data,
+          })
+        } else {
+          console.error('[Billing] transaction insert failed — full error:', JSON.stringify(result.error, null, 2))
+          return res.status(500).json({
+            error: 'Failed to record payment transaction',
+            details: result.error.message,
+            code: result.error.code,
+          })
+        }
+      } else {
+        console.log('[Billing] transaction recorded:', { companyId, paymentId: razorpay_payment_id, data: result.data })
+      }
     } else {
       console.log('[Billing] duplicate transaction skipped, payment already recorded:', razorpay_payment_id)
     }
