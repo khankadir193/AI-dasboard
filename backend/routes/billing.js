@@ -19,8 +19,6 @@ export async function handleCreateOrder(req, res) {
       return res.status(400).json({ error: 'companyId is required' })
     }
 
-    console.log('[Billing] create-order requested for company:', companyId)
-
     const razorpay = getRazorpay()
 
     const order = await razorpay.orders.create({
@@ -29,8 +27,6 @@ export async function handleCreateOrder(req, res) {
       receipt: companyId,
       notes: { company_id: companyId },
     })
-
-    console.log('[Billing] Razorpay order created:', order.id)
 
     return res.status(200).json({
       orderId: order.id,
@@ -79,14 +75,6 @@ export async function handleVerifyPayment(req, res) {
       return res.status(400).json({ error: 'Invalid payment signature' })
     }
 
-    console.log('[Billing] payment verified:', {
-      companyId,
-      paymentId: razorpay_payment_id,
-      orderId: razorpay_order_id,
-      computedSignature: expectedSignature,
-      receivedSignature: razorpay_signature,
-    })
-
     const now = new Date()
     const periodEnd = new Date(now)
     periodEnd.setDate(periodEnd.getDate() + 30)
@@ -125,10 +113,6 @@ export async function handleVerifyPayment(req, res) {
       return res.status(404).json({ error: 'Company not found', companyId })
     }
 
-    console.log('[Billing] company updated to pro:', { companyId, company })
-
-    console.log('[Billing] creating billing transaction:', { companyId, paymentId: razorpay_payment_id })
-
     const { data: existingTx } = await supabase
       .from('billing_transactions')
       .select('id')
@@ -148,10 +132,7 @@ export async function handleVerifyPayment(req, res) {
         provider_subscription_id: razorpay_order_id,
       }
 
-      console.log('[Billing] inserting transaction payload:', JSON.stringify(insertPayload, null, 2))
-
       const result = await supabase.from('billing_transactions').insert(insertPayload).select()
-      console.log('[Billing] insert result:', JSON.stringify(result, null, 2))
 
       if (result.error) {
         const isSchemaError = result.error.code === '42703' || /column.*does not exist/i.test(result.error.message)
@@ -163,13 +144,9 @@ export async function handleVerifyPayment(req, res) {
 
           if (reloadError) {
             console.error('[Billing] pgrst_reload failed:', JSON.stringify(reloadError, null, 2))
-          } else {
-            console.log('[Billing] PostgREST schema cache refreshed')
           }
 
-          console.log('[Billing] retrying insert with full payload...')
           const retryResult = await supabase.from('billing_transactions').insert(insertPayload).select()
-          console.log('[Billing] retry result:', JSON.stringify(retryResult, null, 2))
 
           if (retryResult.error) {
             console.error('[Billing] retry insert failed — full error:', JSON.stringify(retryResult.error, null, 2))
@@ -178,22 +155,13 @@ export async function handleVerifyPayment(req, res) {
             })
           }
 
-          console.log('[Billing] transaction recorded after schema refresh:', {
-            companyId,
-            paymentId: razorpay_payment_id,
-            data: retryResult.data,
-          })
         } else {
           console.error('[Billing] transaction insert failed — full error:', JSON.stringify(result.error, null, 2))
           return res.status(500).json({
             error: 'Failed to record payment transaction',
           })
         }
-      } else {
-        console.log('[Billing] transaction recorded:', { companyId, paymentId: razorpay_payment_id, data: result.data })
       }
-    } else {
-      console.log('[Billing] duplicate transaction skipped, payment already recorded:', razorpay_payment_id)
     }
 
     return res.status(200).json({ success: true, company })
