@@ -143,6 +143,8 @@ export async function handleVerifyPayment(req, res) {
         status: 'succeeded',
         payment_provider: 'razorpay',
         provider_payment_id: razorpay_payment_id,
+        provider_order_id: razorpay_order_id,
+        provider_signature: razorpay_signature,
         provider_subscription_id: razorpay_order_id,
       }
 
@@ -173,8 +175,6 @@ export async function handleVerifyPayment(req, res) {
             console.error('[Billing] retry insert failed — full error:', JSON.stringify(retryResult.error, null, 2))
             return res.status(500).json({
               error: 'Failed to record payment transaction',
-              details: retryResult.error.message,
-              code: retryResult.error.code,
             })
           }
 
@@ -187,8 +187,6 @@ export async function handleVerifyPayment(req, res) {
           console.error('[Billing] transaction insert failed — full error:', JSON.stringify(result.error, null, 2))
           return res.status(500).json({
             error: 'Failed to record payment transaction',
-            details: result.error.message,
-            code: result.error.code,
           })
         }
       } else {
