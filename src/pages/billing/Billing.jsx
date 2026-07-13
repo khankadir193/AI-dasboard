@@ -76,10 +76,16 @@ export default function Billing() {
     setUpgradeError(null)
 
     try {
+      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID
+      if (!razorpayKey) {
+        setUpgradeError('Payment system is not configured. Please contact support.')
+        return
+      }
+
       const { orderId, amount, currency } = await createOrderMut.mutateAsync(companyId)
 
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: razorpayKey,
         order_id: orderId,
         name: 'InsightAI',
         description: 'Pro Plan - ₹999/month',
@@ -95,8 +101,8 @@ export default function Billing() {
               razorpay_signature: response.razorpay_signature,
               companyId,
             })
-          } catch {
-            setUpgradeError('Payment was processed but verification failed. Please contact support.')
+          } catch (err) {
+            setUpgradeError(err?.message || 'Payment was processed but verification failed. Please contact support.')
           }
         },
         modal: {

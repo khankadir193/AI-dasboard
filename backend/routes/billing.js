@@ -52,8 +52,14 @@ export async function handleVerifyPayment(req, res) {
       companyId,
     } = req.body
 
-    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
-      return res.status(400).json({ error: 'Missing payment verification fields' })
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !companyId) {
+      const missing = []
+      if (!razorpay_payment_id) missing.push('razorpay_payment_id')
+      if (!razorpay_order_id) missing.push('razorpay_order_id')
+      if (!razorpay_signature) missing.push('razorpay_signature')
+      if (!companyId) missing.push('companyId')
+      console.error('[Billing] verify-payment missing fields:', { missing, body: req.body })
+      return res.status(400).json({ error: 'Missing payment verification fields', missing })
     }
 
     const body = razorpay_order_id + '|' + razorpay_payment_id
@@ -62,15 +68,28 @@ export async function handleVerifyPayment(req, res) {
       .update(body)
       .digest('hex')
 
-      if (expectedSignature !== razorpay_signature) {
-        return res.status(400).json({ error: 'Invalid payment signature' })
-      }
+    if (expectedSignature !== razorpay_signature) {
+      console.error('[Billing] signature mismatch:', {
+        companyId,
+        paymentId: razorpay_payment_id,
+        orderId: razorpay_order_id,
+        computedSignature: expectedSignature,
+        receivedSignature: razorpay_signature,
+      })
+      return res.status(400).json({ error: 'Invalid payment signature' })
+    }
 
-      console.log('[Billing] payment verified for company:', companyId, 'payment:', razorpay_payment_id)
+    console.log('[Billing] payment verified:', {
+      companyId,
+      paymentId: razorpay_payment_id,
+      orderId: razorpay_order_id,
+      computedSignature: expectedSignature,
+      receivedSignature: razorpay_signature,
+    })
 
-      const now = new Date()
-      const periodEnd = new Date(now)
-      periodEnd.setDate(periodEnd.getDate() + 30)
+    const now = new Date()
+    const periodEnd = new Date(now)
+    periodEnd.setDate(periodEnd.getDate() + 30)
 
     const { data: company, error: updateError } = await supabase
       .from('companies')
@@ -87,11 +106,28 @@ export async function handleVerifyPayment(req, res) {
       .maybeSingle()
 
     if (updateError) {
-      console.error('[Billing] verify-payment update error:', updateError)
-      return res.status(500).json({ error: 'Failed to update subscription' })
+      console.error('[Billing] company update failed:', {
+        companyId,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        code: updateError.code,
+      })
+      return res.status(500).json({
+        error: 'Failed to update subscription',
+        details: updateError.message,
+        code: updateError.code,
+      })
     }
 
-    console.log('[Billing] creating billing transaction for company:', companyId, 'payment:', razorpay_payment_id)
+    if (!company) {
+      console.error('[Billing] company not found after update:', { companyId })
+      return res.status(404).json({ error: 'Company not found', companyId })
+    }
+
+    console.log('[Billing] company updated to pro:', { companyId, company })
+
+    console.log('[Billing] creating billing transaction:', { companyId, paymentId: razorpay_payment_id })
 
     const { data: existingTx } = await supabase
       .from('billing_transactions')
@@ -111,17 +147,35 @@ export async function handleVerifyPayment(req, res) {
       })
 
       if (txError) {
-        console.error('[Billing] billing transaction insert failed:', txError)
-        return res.status(500).json({ error: 'Failed to record payment transaction' })
+        console.error('[Billing] transaction insert failed:', {
+          companyId,
+          paymentId: razorpay_payment_id,
+          message: txError.message,
+          details: txError.details,
+          code: txError.code,
+        })
+        return res.status(500).json({
+          error: 'Failed to record payment transaction',
+          details: txError.message,
+          code: txError.code,
+        })
       }
+
+      console.log('[Billing] transaction recorded:', { companyId, paymentId: razorpay_payment_id })
     } else {
       console.log('[Billing] duplicate transaction skipped, payment already recorded:', razorpay_payment_id)
     }
 
     return res.status(200).json({ success: true, company })
   } catch (error) {
-    console.error('[Billing] verify-payment error:', error)
-    return res.status(500).json({ error: 'Payment verification failed' })
+    console.error('[Billing] verify-payment unexpected error:', {
+      message: error.message,
+      stack: error.stack,
+    })
+    return res.status(500).json({
+      error: 'Payment verification failed',
+      details: error.message,
+    })
   }
 }
 
