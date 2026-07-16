@@ -66,3 +66,31 @@ export async function setFeatureFlags(companyId, flags) {
 
   return data || []
 }
+
+export async function ensureFeatureFlags(companyId) {
+  if (!companyId) return []
+
+  const { data: existing, error: checkError } = await supabase
+    .from('feature_flags')
+    .select('id')
+    .eq('company_id', companyId)
+
+  if (checkError) {
+    console.error('[featureFlagService] ensureFeatureFlags check error:', checkError)
+    return []
+  }
+
+  if (existing && existing.length > 0) {
+    return []
+  }
+
+  const defaultFlags = [
+    { flagKey: 'ai_insights', enabled: true },
+    { flagKey: 'analytics', enabled: true },
+    { flagKey: 'activity_logs', enabled: true },
+    { flagKey: 'notifications', enabled: true },
+  ]
+
+  console.log('[FeatureFlags] seeding defaults for company', companyId, ':', defaultFlags)
+  return setFeatureFlags(companyId, defaultFlags)
+}

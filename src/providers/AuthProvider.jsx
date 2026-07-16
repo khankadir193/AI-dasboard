@@ -9,6 +9,7 @@ import { clearProjects } from '../store/slices/projectsSlice'
 import FullScreenLoader from '../components/common/FullScreenLoader'
 import { trackEvent } from '../features/analytics/trackEvent'
 import { logActivity, ACTIONS, RESOURCE_TYPES } from '../services/activityLogService'
+import { ensureFeatureFlags } from '../services/featureFlagService'
 
 const AUTH_REQUEST_TIMEOUT_MS = 8000
 const PROFILE_RETRY_DELAY_MS = 1500
@@ -230,6 +231,12 @@ export default function AuthProvider({ children }) {
       description: 'User logged in',
       metadata: { role: profileInStore.role }
     })
+  }, [profileInStore?.company_id])
+
+  useEffect(() => {
+    if (!profileInStore?.company_id) return
+    ensureFeatureFlags(profileInStore.company_id)
+      .catch(err => console.error('[AuthProvider] ensureFeatureFlags error:', err))
   }, [profileInStore?.company_id])
 
   if (!isInitialized) {
