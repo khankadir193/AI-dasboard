@@ -20,7 +20,13 @@ export default function AcceptInvitePage() {
   const [sessionUser, setSessionUser] = useState(null)
 
   const finishAndRedirect = useCallback(async () => {
-    navigate('/dashboard', { replace: true })
+    await supabase.auth.signOut()
+    navigate('/signin', {
+      replace: true,
+      state: {
+        message: 'Your account has been created successfully. Please log in to continue.'
+      }
+    })
   }, [navigate])
 
   const handleAlreadyRegistered = useCallback(
