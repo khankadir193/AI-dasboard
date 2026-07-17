@@ -11,6 +11,7 @@ import { clearProfile } from '../../store/slices/profileSlice'
 import { clearTenant } from '../../store/slices/tenantSlice'
 import { clearProjects } from '../../store/slices/projectsSlice'
 import { useSearch } from '../../hooks/useSearch'
+import { useUnreadCount } from '../../features/notifications/hooks/useNotifications'
 import SearchResults from '../common/SearchResults'
 
 const pageTitles = {
@@ -26,6 +27,27 @@ const pageTitles = {
   '/billing': { title: 'Billing', subtitle: 'Manage your subscription plan' },
 }
 
+
+function NotificationBell() {
+  const navigate = useNavigate()
+  const { data: unreadCount = 0 } = useUnreadCount()
+
+  return (
+    <button
+      onClick={() => navigate('/notifications')}
+      className="btn-ghost p-2 relative"
+      type="button"
+      title="Notifications"
+    >
+      <Bell size={18} />
+      {unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full leading-none">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
+    </button>
+  )
+}
 
 export default function Header({ onMenuClick }) {
   const { theme, toggleTheme } = useTheme()
@@ -120,9 +142,7 @@ export default function Header({ onMenuClick }) {
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
-        <button className="btn-ghost p-2 relative" type="button" title="Notifications">
-          <Bell size={18} />
-        </button>
+        <NotificationBell />
 
         <button
           onClick={handleSignOut}

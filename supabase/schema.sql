@@ -491,3 +491,84 @@ ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS activity_logs;
 
 GRANT SELECT, INSERT, UPDATE ON public.feature_flags TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.activity_logs TO authenticated;
+
+-- =====================================================
+-- NOTIFICATIONS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'critical')),
+    resource_type TEXT,
+    resource_id TEXT,
+    is_read BOOLEAN DEFAULT false,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_company ON notifications(company_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their company notifications" ON notifications
+    FOR SELECT USING (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Users can insert company notifications" ON notifications
+    FOR INSERT WITH CHECK (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Users can update their own notifications" ON notifications
+    FOR UPDATE USING (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+GRANT SELECT, INSERT, UPDATE ON public.notifications TO authenticated;
+
+-- =====================================================
+-- GENERATED REPORTS TABLE
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS generated_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
+    report_type TEXT NOT NULL CHECK (report_type IN ('weekly', 'monthly', 'team_productivity', 'executive_summary')),
+    title TEXT NOT NULL,
+    content JSONB NOT NULL,
+    metadata JSONB DEFAULT '{}',
+    created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_generated_reports_company ON generated_reports(company_id);
+CREATE INDEX IF NOT EXISTS idx_generated_reports_type ON generated_reports(report_type);
+CREATE INDEX IF NOT EXISTS idx_generated_reports_created ON generated_reports(created_at DESC);
+
+ALTER TABLE generated_reports ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their company reports" ON generated_reports
+    FOR SELECT USING (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Users can insert company reports" ON generated_reports
+    FOR INSERT WITH CHECK (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Users can delete their company reports" ON generated_reports
+    FOR DELETE USING (
+        company_id IN (SELECT company_id FROM profiles WHERE id = auth.uid())
+    );
+
+GRANT SELECT, INSERT, DELETE ON public.generated_reports TO authenticated;

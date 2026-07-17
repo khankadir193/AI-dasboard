@@ -7,6 +7,7 @@ import {
 } from '../../services/projectsService'
 import { trackEvent } from '../../features/analytics/trackEvent'
 import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
+import { createNotification } from '../../services/notificationsService'
 
 // ============================
 // Async Thunks
@@ -59,6 +60,18 @@ export const createProject = createAsyncThunk(
           description: `Project "${data?.name || ''}" created`,
           metadata: { projectName: data?.name }
         })
+
+        createNotification({
+          companyId,
+          userId,
+          type: 'project_created',
+          title: 'Project Created',
+          message: `Project "${data?.name || ''}" has been created.`,
+          priority: 'medium',
+          resourceType: 'project',
+          resourceId: data?.id,
+          metadata: { projectName: data?.name }
+        }).catch(err => console.error('[projectsSlice] createNotification failed:', err))
       }
 
       return data
@@ -98,6 +111,18 @@ export const deleteProject = createAsyncThunk(
           description: `Project "${deletedProject?.name || ''}" deleted`,
           metadata: { projectName: deletedProject?.name }
         })
+
+        createNotification({
+          companyId,
+          userId,
+          type: 'project_deleted',
+          title: 'Project Deleted',
+          message: `Project "${deletedProject?.name || ''}" has been deleted.`,
+          priority: 'high',
+          resourceType: 'project',
+          resourceId: projectId,
+          metadata: { projectName: deletedProject?.name }
+        }).catch(err => console.error('[projectsSlice] createNotification failed:', err))
       }
 
       return projectId
@@ -137,6 +162,18 @@ export const updateProject = createAsyncThunk(
           description: `Project "${data?.name || ''}" updated`,
           metadata: { updates }
         })
+
+        createNotification({
+          companyId,
+          userId,
+          type: 'project_updated',
+          title: 'Project Updated',
+          message: `Project "${data?.name || ''}" has been updated.`,
+          priority: 'low',
+          resourceType: 'project',
+          resourceId: projectId,
+          metadata: { updates }
+        }).catch(err => console.error('[projectsSlice] createNotification failed:', err))
       }
 
       return data

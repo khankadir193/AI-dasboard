@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
+import { createNotification } from './notificationsService'
 
 const ALLOWED_ROLES = new Set(['admin', 'manager', 'analyst', 'viewer'])
 
@@ -189,6 +190,18 @@ export const createInvite = async ({ email, role, companyId }) => {
 
   if (error) throw new Error(error.message || 'Failed to create invite')
   if (!data) throw new Error('Failed to create invite')
+
+  createNotification({
+    companyId,
+    userId: user.id,
+    type: 'user_invited',
+    title: 'User Invited',
+    message: `${normalizedEmail} has been invited as ${normalizedRole}.`,
+    priority: 'medium',
+    resourceType: 'invite',
+    resourceId: data.id,
+    metadata: { email: normalizedEmail, role: normalizedRole }
+  }).catch(err => console.error('[invitesService] createNotification failed:', err))
 
   return toPendingRowShape(data)
 }

@@ -1,0 +1,246 @@
+import { jsPDF } from 'jspdf'
+import 'jspdf-autotable'
+
+function sanitizeText(text) {
+  if (!text) return ''
+  return String(text)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+    .trim()
+}
+
+function getStatusColor(status) {
+  switch (status) {
+    case 'active': return [16, 185, 129]
+    case 'inactive': return [245, 158, 11]
+    case 'archived': return [239, 68, 68]
+    default: return [107, 114, 128]
+  }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  })
+}
+
+export function exportReportToPDF(report, company) {
+  if (!report) throw new Error('Report data is required')
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+  let y = margin
+
+  const companyName = sanitizeText(company?.name || 'InsightAI')
+
+  const addHeader = () => {
+    doc.setFillColor(59, 130, 246)
+    doc.rect(0, 0, pageWidth, 14, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(8)
+    doc.text(companyName, margin, 10)
+    doc.text(`Generated: ${formatDate(report.content?.generatedAt)}`, pageWidth - margin, 10, { align: 'right' })
+    y = 22
+  }
+
+  const addFooter = () => {
+    const footerY = pageHeight - 10
+    doc.setDrawColor(200, 200, 200)
+    doc.line(margin, footerY, pageWidth - margin, footerY)
+    doc.setTextColor(150, 150, 150)
+    doc.setFontSize(7)
+    doc.text(`${companyName} — Report`, margin, footerY + 5)
+    doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, footerY + 5, { align: 'right' })
+  }
+
+  const checkPageBreak = (needed) => {
+    if (y + needed > pageHeight - 15) {
+      addFooter()
+      doc.addPage()
+      addHeader()
+    }
+  }
+
+  addHeader()
+
+  doc.setTextColor(30, 30, 30)
+  doc.setFontSize(18)
+  doc.setFont(undefined, 'bold')
+  const title = sanitizeText(report.title || 'Report')
+  const titleLines = doc.splitTextToSize(title, contentWidth)
+  doc.text(titleLines, margin, y)
+  y += titleLines.length * 7 + 3
+
+  doc.setFontSize(9)
+  doc.setFont(undefined, 'normal')
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Report Type: ${sanitizeText(report.report_type || 'N/A')}`, margin, y)
+  y += 5
+  const periodLabel = report.content?.dateRange
+    ? `${sanitizeText(report.content.dateRange.startDate)} — ${sanitizeText(report.content.dateRange.endDate)}`
+    : 'N/A'
+  doc.text(`Period: ${periodLabel}`, margin, y)
+  y += 8
+
+  doc.setDrawColor(200, 200, 200)
+  doc.line(margin, y, pageWidth - margin, y)
+  y += 6
+
+  const content = report.content || {}
+
+  if (content.teamSummary) {
+    checkPageBreak(12)
+    doc.setFontSize(10)
+    doc.setTextColor(80, 80, 80)
+    const summaryLines = doc.splitTextToSize(sanitizeText(content.teamSummary), contentWidth)
+    doc.text(summaryLines, margin, y)
+    y += summaryLines.length * 5 + 4
+  }
+
+  const kpiLabels = {
+    activeUsers: 'User Logins',
+    projectsCreated: 'Projects Created',
+    projectsUpdated: 'Projects Updated',
+    projectsDeleted: 'Projects Deleted',
+    dashboardViews: 'Dashboard Views',
+  }
+
+  if (content.kpiData && Object.values(content.kpiData).some(v => v > 0)) {
+    checkPageBreak(30)
+    doc.setFontSize(13)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text('Key Metrics', margin, y)
+    y += 7
+
+    const kpiRows = Object.entries(content.kpiData)
+      .filter(([, value]) => value > 0)
+      .map(([key, value]) => {
+        const label = kpiLabels[key] || key
+        const growth = content.growthData?.[key]
+        const growthStr = growth !== undefined ? `${growth > 0 ? '+' : ''}${growth}%` : '—'
+        return [sanitizeText(label), String(value), growthStr]
+      })
+
+    doc.autoTable({
+      startY: y,
+      head: [['Metric', 'Count', 'Change']],
+      body: kpiRows,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: contentWidth * 0.5 },
+        1: { cellWidth: contentWidth * 0.25, halign: 'center' },
+        2: { cellWidth: contentWidth * 0.25, halign: 'center' },
+      },
+      margin: { left: margin, right: margin },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+
+  if (content.insights && content.insights.length > 0) {
+    checkPageBreak(content.insights.length * 6 + 14)
+    doc.setFontSize(13)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text('Insights', margin, y)
+    y += 7
+
+    doc.setFont(undefined, 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(60, 60, 60)
+
+    content.insights.forEach((insight) => {
+      checkPageBreak(6)
+      const lines = doc.splitTextToSize(`• ${sanitizeText(insight)}`, contentWidth - 4)
+      doc.text(lines, margin + 2, y)
+      y += lines.length * 5 + 1
+    })
+    y += 4
+  }
+
+  if (content.recommendations && content.recommendations.length > 0) {
+    checkPageBreak(content.recommendations.length * 6 + 14)
+    doc.setFontSize(13)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text('Recommendations', margin, y)
+    y += 7
+
+    doc.setFont(undefined, 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(60, 60, 60)
+
+    content.recommendations.forEach((rec) => {
+      checkPageBreak(6)
+      const lines = doc.splitTextToSize(`→ ${sanitizeText(rec)}`, contentWidth - 4)
+      doc.text(lines, margin + 2, y)
+      y += lines.length * 5 + 1
+    })
+    y += 4
+  }
+
+  if (content.projectStatusData && content.projectStatusData.length > 0) {
+    checkPageBreak(content.projectStatusData.length * 8 + 14)
+    doc.setFontSize(13)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text('Project Status', margin, y)
+    y += 7
+
+    const statusRows = content.projectStatusData.map((item) => {
+      const colors = getStatusColor((item.name || '').toLowerCase())
+      return [sanitizeText(item.name || 'Unknown'), String(item.value || 0)]
+    })
+
+    doc.autoTable({
+      startY: y,
+      head: [['Status', 'Count']],
+      body: statusRows,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      margin: { left: margin, right: margin },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+
+  if (content.projectCount > 0 || content.totalEvents > 0) {
+    checkPageBreak(10)
+    doc.setDrawColor(200, 200, 200)
+    doc.line(margin, y, pageWidth - margin, y)
+    y += 6
+
+    doc.setFontSize(8)
+    doc.setTextColor(120, 120, 120)
+    doc.text(`Total Projects: ${content.projectCount || 0}`, margin, y)
+    y += 4
+    doc.text(`Total Events Tracked: ${content.totalEvents || 0}`, margin, y)
+    y += 4
+    doc.text(`Activity Log Entries: ${content.activityCount || 0}`, margin, y)
+    y += 4
+    doc.text(`Report Generated: ${formatDate(content.generatedAt)}`, margin, y)
+  }
+
+  addFooter()
+
+  return doc
+}
+
+export function downloadPDF(doc, filename) {
+  const safeName = `${filename || 'report'}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
+  doc.save(safeName)
+}
+
+export function openPDFInNewTab(doc) {
+  const blob = doc.output('blob')
+  const url = URL.createObjectURL(blob)
+  window.open(url, '_blank')
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}

@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ChevronRight,
   ChevronsLeft,
+  FileText,
 } from 'lucide-react'
 
 import clsx from 'clsx'
@@ -30,6 +31,7 @@ const navItems = [
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
   { to: '/data-table', icon: Table2, label: 'Team Management' },
   { to: '/activity-logs', icon: History, label: 'Activity Logs' },
+  { to: '/reports', icon: FileText, label: 'Reports' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/audit-logs', icon: ScrollText, label: 'Audit Trail' },
 ]

@@ -1,5 +1,6 @@
 import { supabase } from '../../../lib/supabaseClient'
 import { normalizeEmail, isInviteExpired } from '../utils/inviteValidation'
+import { createNotification } from '../../../services/notificationsService'
 
 const SESSION_POLL_INTERVAL_MS = 300
 const SESSION_MAX_WAIT_MS = 15000
@@ -274,6 +275,18 @@ export async function joinWorkspaceFromInvite({ invite, authUser, token }) {
     profileExists: !!finalProfile,
     memberReconciled: !member
   })
+
+  createNotification({
+    companyId: targetCompanyId,
+    userId: authUser.id,
+    type: 'user_joined',
+    title: 'User Joined',
+    message: `${authUser.email || targetEmail} has joined the workspace.`,
+    priority: 'medium',
+    resourceType: 'user',
+    resourceId: authUser.id,
+    metadata: { email: targetEmail, role: targetRole, invitedBy: invite.created_by }
+  }).catch(err => console.error('[invitationService] createNotification failed:', err))
 
   return {
     id: finalProfile.id || authUser.id,

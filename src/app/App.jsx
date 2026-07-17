@@ -3,6 +3,7 @@ import Layout from '../components/layout/Layout.jsx'
 import Dashboard from '../features/dashboard/Dashboard.jsx'
 import Analytics from '../features/analytics/Analytics.jsx'
 import AIInsightsPage from '../features/ai/pages/AIInsightsPage.jsx'
+import ReportsPage from '../features/reports/ReportsPage.jsx'
 import DataTable from '../features/users/DataTable.jsx'
 import Projects from '../features/projects/Projects.jsx'
 import Settings from '../features/organization/Settings.jsx'
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/data-table" element={<DataTable />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/activity-logs" element={<ActivityLogs />} />
+          <Route path="/reports" element={<ReportsPage />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/audit-logs" element={<AuditLogs />} />
           <Route path="/settings" element={<Settings />} />
