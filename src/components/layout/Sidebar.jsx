@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useSelector } from 'react-redux'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   BarChart3,
@@ -59,6 +60,7 @@ export default function Sidebar({ open, onClose }) {
   const { profile } = useSelector((state) => state.profile)
   const companyId = profile?.company_id
   const { data: subscription } = useSubscription(companyId)
+  const queryClient = useQueryClient()
 
   const isAuthenticated = Boolean(user && (profile || user.email))
   const displayName =
@@ -79,6 +81,10 @@ export default function Sidebar({ open, onClose }) {
     subscription &&
     subscription?.subscription_plan !== 'pro' &&
     subscription?.subscription_plan !== 'enterprise'
+
+  const handleNotificationsClick = (e) => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] })
+  }
 
   return (
     <>
@@ -122,7 +128,12 @@ export default function Sidebar({ open, onClose }) {
 
           <div className="flex flex-col space-y-1">
             {navItems.map(({ to, icon: Icon, label }) => (
-              <NavLink key={to} to={to} className={navLinkClass}>
+              <NavLink
+                key={to}
+                to={to}
+                className={navLinkClass}
+                onClick={to === '/notifications' ? handleNotificationsClick : undefined}
+              >
                 <Icon size={18} className="flex-none" />
                 <span className="truncate">{label}</span>
               </NavLink>

@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { AlertCircle, CheckCheck } from 'lucide-react'
+﻿import { useState, useCallback } from 'react'
+import { AlertCircle, CheckCheck, RefreshCw } from 'lucide-react'
 import { useNotifications, useMarkAsRead, useMarkAllAsRead, useUnreadCount } from './hooks/useNotifications'
 import NotificationItem from './components/NotificationItem'
 import NotificationFilters from './components/NotificationFilters'
@@ -44,7 +44,7 @@ function NotificationsContent() {
 
   const readFilterValue = readFilter === 'unread' ? false : readFilter === 'read' ? true : undefined
 
-  const { data, isLoading, error, refetch } = useNotifications({
+  const { data, isLoading, isFetching, error, refetch } = useNotifications({
     page,
     pageSize: PAGE_SIZE,
     type: typeFilter || undefined,
@@ -117,6 +117,13 @@ function NotificationsContent() {
         onClear={handleClearFilters}
         hasActiveFilters={!!typeFilter || !!priorityFilter || !!readFilter}
       />
+
+      {isFetching && !isLoading && (
+        <div className="flex items-center justify-center gap-2 py-2 text-xs text-blue-600 dark:text-blue-400 animate-pulse">
+          <RefreshCw size={12} className="animate-spin" />
+          Refreshing notifications...
+        </div>
+      )}
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {isLoading ? (

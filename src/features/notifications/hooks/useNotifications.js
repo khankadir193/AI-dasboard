@@ -13,16 +13,16 @@ export function useNotifications(filters = {}) {
 
   const { page = 1, pageSize = 20, type, priority, isRead, startDate, endDate } = filters
 
-  const query = useQuery({
+  return useQuery({
     queryKey: ['notifications', companyId, page, pageSize, type, priority, isRead, startDate, endDate],
     queryFn: () => fetchNotifications({ companyId, page, pageSize, type, priority, isRead, startDate, endDate }),
     enabled: !!companyId,
-    staleTime: 15000,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     refetchInterval: 30000,
     retry: 1,
   })
-
-  return query
 }
 
 export function useUnreadCount() {
@@ -33,7 +33,9 @@ export function useUnreadCount() {
     queryKey: ['notifications', 'unreadCount', companyId],
     queryFn: () => getUnreadCount(companyId),
     enabled: !!companyId,
-    staleTime: 10000,
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     refetchInterval: 20000,
     retry: 0,
   })
