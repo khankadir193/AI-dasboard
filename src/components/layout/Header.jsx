@@ -19,6 +19,7 @@ const pageTitles = {
   '/analytics': { title: 'Analytics', subtitle: 'Deep dive into your metrics' },
   '/ai-insights': { title: 'AI Insights', subtitle: 'Powered by GPT-4' },
   '/projects': { title: 'Projects', subtitle: 'Manage all your projects' },
+  '/reports': { title: 'Reports', subtitle: 'Generate AI-powered business reports and track report history.' },
   '/data-table': { title: 'Team Management', subtitle: 'Manage members, roles, and access' },
   '/activity-logs': { title: 'Activity Logs', subtitle: 'Track your recent activities' },
   '/notifications': { title: 'Notifications', subtitle: 'View your recent notifications' },

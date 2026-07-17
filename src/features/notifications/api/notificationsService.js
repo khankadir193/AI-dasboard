@@ -56,18 +56,22 @@ export async function createNotification({ companyId, userId, type, title, messa
   RECENT_KEYS.set(dedupKey, now)
   startCleanup()
 
+  const insertMetadata = {
+    ...metadata,
+    ...(priority !== undefined && { priority }),
+    ...(userId !== undefined && { userId }),
+    ...(resourceType !== undefined && { resourceType }),
+    ...(resourceId !== undefined && { resourceId }),
+  }
+
   const { data, error } = await supabase
     .from('notifications')
     .insert({
       company_id: companyId,
-      user_id: userId || null,
       type,
       title,
       message,
-      priority,
-      resource_type: resourceType || null,
-      resource_id: resourceId || null,
-      metadata,
+      metadata: insertMetadata,
     })
     .select()
     .maybeSingle()
@@ -93,7 +97,7 @@ export async function fetchNotifications({ companyId, page = 1, pageSize = 20, t
       .eq('company_id', companyId)
 
     if (type) query = query.eq('type', type)
-    if (priority) query = query.eq('priority', priority)
+    if (priority) query = query.eq('metadata->>priority', priority)
     if (isRead !== undefined && isRead !== null) query = query.eq('is_read', isRead)
     if (startDate) query = query.gte('created_at', startDate)
     if (endDate) query = query.lte('created_at', endDate)
@@ -134,7 +138,7 @@ export async function markAsRead(notificationId) {
   return data
 }
 
-export async function markAllAsRead(companyId, userId) {
+export async function markAllAsRead(companyId) {
   if (!companyId) throw new Error('Company ID is required')
 
   const { data, error } = await supabase

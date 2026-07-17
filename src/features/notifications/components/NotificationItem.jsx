@@ -4,7 +4,8 @@ import { formatDateTime, timeAgo, NOTIFICATION_STYLES, PRIORITY_STYLES } from '.
 
 export default function NotificationItem({ notification, onMarkAsRead, isMarking }) {
   const typeStyle = NOTIFICATION_STYLES[notification.type] || { label: notification.type, badgeVariant: 'default' }
-  const priorityStyle = PRIORITY_STYLES[notification.priority] || PRIORITY_STYLES.medium
+  const priorityValue = notification.metadata?.priority || 'medium'
+  const priorityStyle = PRIORITY_STYLES[priorityValue] || PRIORITY_STYLES.medium
 
   const handleClick = () => {
     if (!notification.is_read) {

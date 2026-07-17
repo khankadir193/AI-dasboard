@@ -57,7 +57,7 @@ export function useMarkAllAsRead() {
   const companyId = profile?.company_id
 
   return useMutation({
-    mutationFn: () => markAllAsRead(companyId, profile?.id),
+    mutationFn: () => markAllAsRead(companyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
     },
