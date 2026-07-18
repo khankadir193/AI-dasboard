@@ -24,12 +24,22 @@ function ReportsContent() {
   const pageSize = 10
 
   const { data, isLoading, error, refetch } = useReports({ page, pageSize, type: typeFilter || undefined })
+  const [generateError, setGenerateError] = useState(null)
+  const [phase, setPhase] = useState('idle')
   const generateMutation = useGenerateReport()
   const deleteMutation = useDeleteReport()
 
   const handleGenerate = async ({ type, title }) => {
     if (!type) return
-    await generateMutation.mutateAsync({ type, title })
+    setGenerateError(null)
+    setPhase('generating')
+    try {
+      await generateMutation.mutateAsync({ type, title })
+      setPhase('idle')
+    } catch (err) {
+      setPhase('error')
+      setGenerateError(err?.message || 'Failed to generate report')
+    }
   }
 
   const handleDelete = async (reportId) => {
@@ -55,9 +65,18 @@ function ReportsContent() {
         </div>
       </div>
 
+      {generateError && (
+        <div className="flex items-center gap-2 p-3 text-sm text-red-700 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg">
+          <AlertCircle size={16} className="flex-shrink-0" />
+          <span className="flex-1">{generateError}</span>
+          <button onClick={() => setGenerateError(null)} className="text-red-500 hover:text-red-700 font-bold">&times;</button>
+        </div>
+      )}
+
       <ReportGenerator
         onGenerate={handleGenerate}
         isGenerating={generateMutation.isPending}
+        phase={phase}
       />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

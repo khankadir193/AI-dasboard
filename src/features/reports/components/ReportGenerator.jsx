@@ -9,7 +9,7 @@ const REPORT_TYPE_OPTIONS = [
   { value: REPORT_TYPES.EXECUTIVE_SUMMARY, label: 'Executive Summary', desc: 'High-level overview for leadership' },
 ]
 
-export default function ReportGenerator({ onGenerate, isGenerating }) {
+export default function ReportGenerator({ onGenerate, isGenerating, phase }) {
   const [selectedType, setSelectedType] = useState(REPORT_TYPES.WEEKLY)
   const [customTitle, setCustomTitle] = useState('')
 
@@ -17,7 +17,6 @@ export default function ReportGenerator({ onGenerate, isGenerating }) {
     e.preventDefault()
     if (!selectedType || isGenerating) return
     onGenerate({ type: selectedType, title: customTitle.trim() || undefined })
-    setCustomTitle('')
   }
 
   return (
@@ -72,7 +71,7 @@ export default function ReportGenerator({ onGenerate, isGenerating }) {
             {isGenerating ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                Generating...
+                {phase === 'generating' ? 'Generating report...' : 'Saving report...'}
               </>
             ) : (
               <>

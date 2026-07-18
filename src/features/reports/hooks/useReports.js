@@ -17,7 +17,8 @@ export function useReports(filters = {}) {
     queryKey: ['reports', companyId, page, pageSize, type],
     queryFn: () => fetchReports({ companyId, page, pageSize, type }),
     enabled: !!companyId,
-    staleTime: 30000,
+    staleTime: 60000,
+    gcTime: 300000,
     retry: 1,
   })
 }
@@ -30,7 +31,8 @@ export function useReportById(reportId) {
     queryKey: ['reports', 'detail', reportId],
     queryFn: () => getReportById(reportId),
     enabled: !!companyId && !!reportId,
-    staleTime: 60000,
+    staleTime: 120000,
+    gcTime: 300000,
     retry: 1,
   })
 }

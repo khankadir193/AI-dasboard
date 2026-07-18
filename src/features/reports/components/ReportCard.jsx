@@ -15,7 +15,9 @@ export default function ReportCard({ report, profile, onDelete, isDeleting }) {
   const handleExport = async () => {
     setExporting(true)
     try {
-      const company = { name: profile?.companies?.name }
+      const companyData = profile?.companies
+      const companyObj = Array.isArray(companyData) ? companyData[0] : companyData
+      const company = { name: companyObj?.name || 'InsightAI' }
       const doc = exportReportToPDF(report, company)
       downloadPDF(doc, `report-${report.report_type}-${report.id?.slice(0, 8)}`)
     } catch (err) {

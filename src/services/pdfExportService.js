@@ -28,6 +28,9 @@ function formatDate(dateStr) {
 
 export function exportReportToPDF(report, company) {
   if (!report) throw new Error('Report data is required')
+  if (!report.content || typeof report.content !== 'object') {
+    report = { ...report, content: { generatedAt: new Date().toISOString(), dateRange: null, kpiData: {}, growthData: {}, timelineData: [], projectStatusData: [], projectCount: 0, activityCount: 0, totalEvents: 0, insights: ['Report content is being generated. Please wait for the report to complete before exporting.'], recommendations: ['Try exporting again after the report has finished generating.'], reportSummary: '', teamSummary: 'Report data is being prepared. Please try exporting again shortly.' } }
+  }
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -95,7 +98,13 @@ export function exportReportToPDF(report, company) {
 
   if (content.teamSummary) {
     checkPageBreak(12)
+    doc.setFontSize(13)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text('Executive Summary', margin, y)
+    y += 7
     doc.setFontSize(10)
+    doc.setFont(undefined, 'normal')
     doc.setTextColor(80, 80, 80)
     const summaryLines = doc.splitTextToSize(sanitizeText(content.teamSummary), contentWidth)
     doc.text(summaryLines, margin, y)
@@ -108,6 +117,16 @@ export function exportReportToPDF(report, company) {
     projectsUpdated: 'Projects Updated',
     projectsDeleted: 'Projects Deleted',
     dashboardViews: 'Dashboard Views',
+  }
+
+  if (content.reportSummary) {
+    checkPageBreak(14)
+    doc.setFontSize(10)
+    doc.setFont(undefined, 'normal')
+    doc.setTextColor(90, 90, 90)
+    const summaryLines = doc.splitTextToSize(sanitizeText(content.reportSummary), contentWidth)
+    doc.text(summaryLines, margin, y)
+    y += summaryLines.length * 5 + 6
   }
 
   if (content.kpiData && Object.values(content.kpiData).some(v => v > 0)) {
@@ -191,11 +210,10 @@ export function exportReportToPDF(report, company) {
     doc.setFontSize(13)
     doc.setFont(undefined, 'bold')
     doc.setTextColor(30, 30, 30)
-    doc.text('Project Status', margin, y)
+    doc.text('Project Statistics', margin, y)
     y += 7
 
     const statusRows = content.projectStatusData.map((item) => {
-      const colors = getStatusColor((item.name || '').toLowerCase())
       return [sanitizeText(item.name || 'Unknown'), String(item.value || 0)]
     })
 
@@ -211,8 +229,41 @@ export function exportReportToPDF(report, company) {
     y = doc.lastAutoTable.finalY + 8
   }
 
-  if (content.projectCount > 0 || content.totalEvents > 0) {
-    checkPageBreak(10)
+  if (content.teamActivity && content.teamActivity.length > 0) {
+    checkPageBreak(content.teamActivity.length * 8 + 14)
+    doc.setFontSize(13)
+    doc.setFont(undefined, 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text('Team Activity', margin, y)
+    y += 7
+
+    const teamRows = content.teamActivity.map((member) => [
+      sanitizeText(member.name || 'Unknown'),
+      String(member.totalActions || 0),
+      String(member.projectsCreated || 0),
+      String(member.logins || 0),
+    ])
+
+    doc.autoTable({
+      startY: y,
+      head: [['Team Member', 'Actions', 'Projects Created', 'Logins']],
+      body: teamRows,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: contentWidth * 0.4 },
+        1: { cellWidth: contentWidth * 0.2, halign: 'center' },
+        2: { cellWidth: contentWidth * 0.2, halign: 'center' },
+        3: { cellWidth: contentWidth * 0.2, halign: 'center' },
+      },
+      margin: { left: margin, right: margin },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+
+  {
+    checkPageBreak(14)
     doc.setDrawColor(200, 200, 200)
     doc.line(margin, y, pageWidth - margin, y)
     y += 6
@@ -221,6 +272,14 @@ export function exportReportToPDF(report, company) {
     doc.setTextColor(120, 120, 120)
     doc.text(`Total Projects: ${content.projectCount || 0}`, margin, y)
     y += 4
+    if (content.activeProjects !== undefined) {
+      doc.text(`Active Projects: ${content.activeProjects}`, margin, y)
+      y += 4
+    }
+    if (content.completionRate !== undefined) {
+      doc.text(`Completion Rate: ${content.completionRate}%`, margin, y)
+      y += 4
+    }
     doc.text(`Total Events Tracked: ${content.totalEvents || 0}`, margin, y)
     y += 4
     doc.text(`Activity Log Entries: ${content.activityCount || 0}`, margin, y)
