@@ -239,7 +239,7 @@ export function exportReportToPDF(report, company) {
   }
 
   if (content.recommendations && content.recommendations.length > 0) {
-    checkPageBreak(content.recommendations.length * 6 + 14)
+    checkPageBreak(content.recommendations.length * 12 + 14)
     doc.setFontSize(13)
     doc.setFont(undefined, 'bold')
     doc.setTextColor(30, 30, 30)
@@ -251,8 +251,8 @@ export function exportReportToPDF(report, company) {
     doc.setTextColor(60, 60, 60)
 
     content.recommendations.forEach((rec) => {
-      checkPageBreak(6)
-      const lines = doc.splitTextToSize(`→ ${sanitizeText(rec)}`, contentWidth - 4)
+      const lines = doc.splitTextToSize(`• ${sanitizeText(rec)}`, contentWidth - 4)
+      checkPageBreak(lines.length * 5 + 1)
       doc.text(lines, margin + 2, y)
       y += lines.length * 5 + 1
     })
