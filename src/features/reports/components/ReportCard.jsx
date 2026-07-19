@@ -10,9 +10,14 @@ export default function ReportCard({ report, profile, onDelete, isDeleting }) {
   const typeStyle = TYPE_ICONS_MAP[report.report_type] || TYPE_ICONS_MAP.weekly
   const IconMap = { FileText, BarChart3, Target, Clock }
   const Icon = IconMap[typeStyle.icon] || FileText
-  const content = report.content || {}
+  const content = typeof report.content === 'string'
+    ? (() => { try { return JSON.parse(report.content) } catch { return {} } })()
+    : (report.content || {})
 
   const handleExport = async () => {
+    if (!report?.content || typeof report.content !== 'object') {
+      console.warn('[ReportCard] Report content is missing or invalid, PDF will use available data', { reportId: report?.id, reportType: report?.report_type })
+    }
     setExporting(true)
     try {
       const companyData = profile?.companies
@@ -21,7 +26,7 @@ export default function ReportCard({ report, profile, onDelete, isDeleting }) {
       const doc = exportReportToPDF(report, company)
       downloadPDF(doc, `report-${report.report_type}-${report.id?.slice(0, 8)}`)
     } catch (err) {
-      console.error('Export failed:', err)
+      console.error('[ReportCard] Export failed:', err)
     } finally {
       setExporting(false)
     }

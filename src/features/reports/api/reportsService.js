@@ -18,14 +18,6 @@ const LABEL_MAP = {
   dashboard_view: 'Dashboard Views',
 }
 
-const EMPTY_KPI = {
-  activeUsers: 0, projectsCreated: 0, projectsUpdated: 0, projectsDeleted: 0, dashboardViews: 0,
-}
-
-const EMPTY_GROWTH = {
-  activeUsers: 0, projectsCreated: 0, projectsUpdated: 0, projectsDeleted: 0, dashboardViews: 0,
-}
-
 function safeLabel(key) {
   return LABEL_MAP[key] || key
 }
@@ -200,19 +192,38 @@ function buildTeamSummary(type, projectCount, totalEvents, activityCount, kpiDat
 async function computeTeamActivity(logs) {
   if (!logs || logs.length === 0) return []
 
+  // Group by user_id and compute required counters.
   const userMap = new Map()
 
-  logs.forEach(log => {
+  logs.forEach((log) => {
     const uid = log.user_id
     if (!uid) return
+
     if (!userMap.has(uid)) {
-      userMap.set(uid, { userId: uid, totalActions: 0, projectCreations: 0, logins: 0, dashboardViews: 0 })
+      userMap.set(uid, {
+        userId: uid,
+        totalActions: 0,
+        projectsCreated: 0,
+        projectsUpdated: 0,
+        logins: 0,
+      })
     }
+
     const entry = userMap.get(uid)
     entry.totalActions++
-    if (log.action === 'project_create') entry.projectCreations++
-    if (log.action === 'login') entry.logins++
-    if (log.action === 'dashboard_view') entry.dashboardViews++
+
+    // Action names may vary; support common variants.
+    if (log.action === 'project_create' || log.action === 'projects_created' || log.action === 'project_created') {
+      entry.projectsCreated++
+    }
+
+    if (log.action === 'project_update' || log.action === 'project_updated' || log.action === 'projects_updated') {
+      entry.projectsUpdated++
+    }
+
+    if (log.action === 'login' || log.action === 'logins' || log.action === 'user_login') {
+      entry.logins++
+    }
   })
 
   const userIds = Array.from(userMap.keys())
@@ -223,89 +234,41 @@ async function computeTeamActivity(logs) {
       .select('id, full_name, email')
       .in('id', userIds)
     profiles = data || []
-  } catch {}
+  } catch { }
 
   const profileMap = {}
-  profiles.forEach(p => { profileMap[p.id] = p.full_name || p.email || 'Unknown' })
+  profiles.forEach((p) => { profileMap[p.id] = p.full_name || p.email || 'Unknown' })
 
   return Array.from(userMap.values())
     .sort((a, b) => b.totalActions - a.totalActions)
     .map((entry, index) => ({
       rank: index + 1,
       name: profileMap[entry.userId] || 'Team Member',
+
+      // Required by your generator spec
       totalActions: entry.totalActions,
-      projectsCreated: entry.projectCreations,
+      projectsCreated: entry.projectsCreated,
+      projectsUpdated: entry.projectsUpdated,
       logins: entry.logins,
+
+      // PDF ignores this today but keep it for potential UI usage.
       contributions: entry.totalActions,
     }))
 }
 
 function validateGeneratedContent(content) {
-  if (!content) return false
+  if (!content || typeof content !== 'object') return false
+  const REQUIRED_KEYS = ['generatedAt', 'dateRange', 'kpiData', 'growthData', 'projectCount', 'totalEvents', 'insights', 'recommendations', 'reportSummary', 'teamSummary']
+  for (const key of REQUIRED_KEYS) {
+    if (!(key in content)) return false
+  }
   const textParts = [
     content.teamSummary,
     ...(content.insights || []),
     ...(content.recommendations || [])
   ].filter(Boolean)
   const totalLength = textParts.join(' ').trim().length
-  return totalLength >= 50
-}
-
-function generateFallbackContent({ type, projects, kpiData, growthData, timelineData, projectStatusData, activityCount, totalEvents, dateRange }) {
-  const now = new Date()
-  const projectList = Array.isArray(projects) ? projects : []
-  const activeProjects = projectList.filter(function(p) { return p.status === 'active' }).length
-  const completionRate = projectList.length > 0 ? Math.round((activeProjects / projectList.length) * 100) : 0
-
-  const typeSummary = getTypeSummary(type)
-
-  const insights = []
-  insights.push(typeSummary)
-  insights.push('Report generated on ' + now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + '.')
-  insights.push('Total Projects: ' + projectList.length + ' (' + activeProjects + ' active, ' + completionRate + '% completion rate).')
-  insights.push('Total events tracked: ' + totalEvents + '. Team activity count: ' + activityCount + '.')
-
-  if (totalEvents > 0) {
-    const topMetrics = Object.entries(kpiData)
-      .filter(function(entry) { return entry[1] > 0 })
-      .sort(function(a, b) { return b[1] - a[1] })
-      .slice(0, 3)
-      .map(function(entry) { return safeLabel(entry[0]) + ': ' + entry[1] })
-    if (topMetrics.length > 0) {
-      insights.push('Top metrics: ' + topMetrics.join(', ') + '.')
-    }
-  }
-
-  const recommendations = []
-  if (projectList.length === 0) {
-    recommendations.push('Start creating projects to track your team\'s work effectively and generate meaningful analytics.')
-  } else {
-    recommendations.push('Continue monitoring project progress to ensure timely delivery and identify bottlenecks early.')
-  }
-  if (totalEvents === 0) {
-    recommendations.push('Encourage team members to log their activities for better visibility into productivity patterns.')
-  } else {
-    recommendations.push('Maintain current activity levels for consistent productivity across the workspace.')
-  }
-  recommendations.push('Review and update project statuses regularly for accurate reporting and resource planning.')
-
-  return {
-    generatedAt: now.toISOString(),
-    dateRange: dateRange || { startDate: 'N/A', endDate: now.toISOString().split('T')[0] },
-    kpiData: kpiData,
-    growthData: growthData || EMPTY_GROWTH,
-    timelineData: timelineData || [],
-    projectStatusData: projectStatusData || [],
-    projectCount: projectList.length,
-    activeProjects: activeProjects,
-    completionRate: completionRate,
-    activityCount: activityCount,
-    totalEvents: totalEvents,
-    insights: insights,
-    recommendations: recommendations,
-    reportSummary: typeSummary,
-    teamSummary: buildTeamSummary(type, projectList.length, totalEvents, activityCount, kpiData),
-  }
+  return totalLength >= 30
 }
 
 async function getDateRangeForType(type) {
@@ -318,12 +281,15 @@ async function getDateRangeForType(type) {
       start.setDate(start.getDate() - 7)
       break
     case REPORT_TYPES.MONTHLY:
-      start.setMonth(start.getMonth() - 1)
+      // Strict rolling last 30 days (not "previous month")
+      start.setDate(start.getDate() - 30)
       break
     case REPORT_TYPES.TEAM_PRODUCTIVITY:
+      // Keep existing behavior unless you later require otherwise
       start.setDate(start.getDate() - 14)
       break
     case REPORT_TYPES.EXECUTIVE_SUMMARY:
+      // Existing behavior: 90-day-like approximation by months.
       start.setMonth(start.getMonth() - 3)
       break
     default:
@@ -354,87 +320,286 @@ function getDefaultTitle(type) {
   }
 }
 
+async function generateWeeklyReport({ companyId }) {
+  const dateRange = await getDateRangeForType(REPORT_TYPES.WEEKLY)
+
+  const [kpiData, timelineData, projectStatusData, activityLogsResult] = await Promise.all([
+    analyticsService.getKpiMetrics(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getActivityTimeline(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getProjectStatus(companyId),
+    fetchActivityLogs({ companyId, pageSize: 100, startDate: dateRange.startDate, endDate: dateRange.endDate }),
+  ])
+
+  const projects = await getProjects(companyId)
+  const projectList = Array.isArray(projects) ? projects : []
+  const projectCount = projectList.length
+  const activeProjects = projectList.filter(p => p.status === 'active').length
+  const completionRate = projectCount > 0 ? Math.round((activeProjects / projectCount) * 100) : 0
+  const activityCount = activityLogsResult?.totalCount || 0
+  const totalEvents = Object.values(kpiData).reduce((a, b) => a + b, 0)
+  const avgDailyEvents = Math.round(totalEvents / 7)
+
+  const hasData = totalEvents > 0 || activityCount > 0 || projectCount > 0
+  if (!hasData) {
+    console.info('[Reports] Weekly report generated with no data for the selected period.')
+  }
+
+  const insights = generateInsights(kpiData, {}, projectCount, activityCount, REPORT_TYPES.WEEKLY)
+  const recommendations = generateRecommendations(kpiData, {}, projectCount, activityCount, REPORT_TYPES.WEEKLY)
+
+  return {
+    generatedAt: new Date().toISOString(),
+    dateRange,
+    kpiData,
+    growthData: {},
+    timelineData,
+    projectStatusData,
+    projectCount,
+    activeProjects,
+    completionRate,
+    activityCount,
+    totalEvents,
+    avgDailyEvents,
+    insights,
+    recommendations,
+    reportSummary: getTypeSummary(REPORT_TYPES.WEEKLY),
+    teamSummary: buildTeamSummary(REPORT_TYPES.WEEKLY, projectCount, totalEvents, activityCount, kpiData),
+  }
+}
+
+async function generateMonthlyReport({ companyId }) {
+  const dateRange = await getDateRangeForType(REPORT_TYPES.MONTHLY)
+
+  const [kpiData, growthData, timelineData, projectStatusData, activityLogsResult] = await Promise.all([
+    analyticsService.getKpiMetrics(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getGrowthMetrics(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getActivityTimeline(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getProjectStatus(companyId),
+    fetchActivityLogs({ companyId, pageSize: 100, startDate: dateRange.startDate, endDate: dateRange.endDate }),
+  ])
+
+  const projects = await getProjects(companyId)
+  const projectList = Array.isArray(projects) ? projects : []
+  const projectCount = projectList.length
+  const activeProjects = projectList.filter(p => p.status === 'active').length
+  const completionRate = projectCount > 0 ? Math.round((activeProjects / projectCount) * 100) : 0
+  const activityCount = activityLogsResult?.totalCount || 0
+  const totalEvents = Object.values(kpiData).reduce((a, b) => a + b, 0)
+  const avgDailyEvents = Math.round(totalEvents / 30)
+
+  const hasData = totalEvents > 0 || activityCount > 0 || projectCount > 0
+  if (!hasData) {
+    console.info('[Reports] Monthly report generated with no data for the selected period.')
+  }
+
+  const insights = generateInsights(kpiData, growthData, projectCount, activityCount, REPORT_TYPES.MONTHLY)
+  const recommendations = generateRecommendations(kpiData, growthData, projectCount, activityCount, REPORT_TYPES.MONTHLY)
+
+  return {
+    generatedAt: new Date().toISOString(),
+    dateRange,
+    kpiData,
+    growthData,
+    timelineData,
+    projectStatusData,
+    projectCount,
+    activeProjects,
+    completionRate,
+    activityCount,
+    totalEvents,
+    avgDailyEvents,
+    insights,
+    recommendations,
+    reportSummary: getTypeSummary(REPORT_TYPES.MONTHLY),
+    teamSummary: buildTeamSummary(REPORT_TYPES.MONTHLY, projectCount, totalEvents, activityCount, kpiData),
+  }
+}
+
+async function generateTeamProductivityReport({ companyId }) {
+  const dateRange = await getDateRangeForType(REPORT_TYPES.TEAM_PRODUCTIVITY)
+
+  const [kpiData, projectStatusData, activityLogsResult] = await Promise.all([
+    analyticsService.getKpiMetrics(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getProjectStatus(companyId),
+    fetchActivityLogs({ companyId, pageSize: 1000, startDate: dateRange.startDate, endDate: dateRange.endDate }),
+  ])
+
+  const projects = await getProjects(companyId)
+  const projectList = Array.isArray(projects) ? projects : []
+  const projectCount = projectList.length
+  const activeProjects = projectList.filter(p => p.status === 'active').length
+  const completionRate = projectCount > 0 ? Math.round((activeProjects / projectCount) * 100) : 0
+  const activityCount = activityLogsResult?.totalCount || 0
+  const totalEvents = Object.values(kpiData).reduce((a, b) => a + b, 0)
+  const avgDailyEvents = Math.round(totalEvents / 14)
+
+  const hasData = totalEvents > 0 || activityCount > 0 || projectCount > 0
+  if (!hasData) {
+    console.info('[Reports] Team Productivity report generated with no data for the selected period.')
+  }
+
+  const insights = generateInsights(kpiData, {}, projectCount, activityCount, REPORT_TYPES.TEAM_PRODUCTIVITY)
+  const recommendations = generateRecommendations(kpiData, {}, projectCount, activityCount, REPORT_TYPES.TEAM_PRODUCTIVITY)
+
+  // Required by your spec: group activity_logs by user_id and populate teamActivity.
+  let teamActivity = []
+  const logs = activityLogsResult?.logs || []
+  if (logs.length > 0) {
+    teamActivity = await computeTeamActivity(logs)
+
+    if (teamActivity.length > 0) {
+      const top = teamActivity[0]
+      insights.push(`Top contributor: ${top.name} with ${top.totalActions} actions during this period.`)
+    }
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    dateRange,
+    kpiData,
+    growthData: {},
+    timelineData: [],
+    projectStatusData,
+    projectCount,
+    activeProjects,
+    completionRate,
+    activityCount,
+    totalEvents,
+    avgDailyEvents,
+    insights,
+    recommendations,
+    reportSummary: getTypeSummary(REPORT_TYPES.TEAM_PRODUCTIVITY),
+    teamSummary: buildTeamSummary(REPORT_TYPES.TEAM_PRODUCTIVITY, projectCount, totalEvents, activityCount, kpiData),
+    teamActivity,
+  }
+}
+
+async function generateExecutiveSummaryReport({ companyId }) {
+  const dateRange = await getDateRangeForType(REPORT_TYPES.EXECUTIVE_SUMMARY)
+
+  const [kpiData, growthData, timelineData, projectStatusData, activityLogsResult] = await Promise.all([
+    analyticsService.getKpiMetrics(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getGrowthMetrics(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getActivityTimeline(dateRange.startDate, dateRange.endDate, companyId),
+    analyticsService.getProjectStatus(companyId),
+    fetchActivityLogs({ companyId, pageSize: 100, startDate: dateRange.startDate, endDate: dateRange.endDate }),
+  ])
+
+  const projects = await getProjects(companyId)
+  const projectList = Array.isArray(projects) ? projects : []
+  const projectCount = projectList.length
+  const activeProjects = projectList.filter(p => p.status === 'active').length
+  const completionRate = projectCount > 0 ? Math.round((activeProjects / projectCount) * 100) : 0
+  const activityCount = activityLogsResult?.totalCount || 0
+  const totalEvents = Object.values(kpiData).reduce((a, b) => a + b, 0)
+  const avgDailyEvents = Math.round(totalEvents / 90)
+
+  const hasData = totalEvents > 0 || activityCount > 0 || projectCount > 0
+  if (!hasData) {
+    console.info('[Reports] Executive Summary report generated with no data for the selected period.')
+  }
+
+  // Leadership-focused insights/recommendations (still derived from KPI/growth for now),
+  // but we will not include raw KPI tables in the PDF to avoid KPI-only duplication.
+  const insights = generateInsights(kpiData, growthData, projectCount, activityCount, REPORT_TYPES.EXECUTIVE_SUMMARY)
+  const recommendations = generateRecommendations(kpiData, growthData, projectCount, activityCount, REPORT_TYPES.EXECUTIVE_SUMMARY)
+
+  // Leadership summary: prioritize strategic themes over raw metrics list.
+  const leadershipSummaryParts = []
+  leadershipSummaryParts.push(`${projectCount} total project(s) in scope (${activeProjects} active).`)
+  leadershipSummaryParts.push(`${completionRate}% completion rate across the portfolio (approx).`)
+  leadershipSummaryParts.push(`${activityCount} activity log entr(ies) captured across the organization.`)
+
+  const teamSummary = leadershipSummaryParts.join(' ')
+
+  return {
+    generatedAt: new Date().toISOString(),
+    dateRange,
+
+    // IMPORTANT: avoid duplicating KPI-only output by removing KPI payloads
+    // so PDF Key Metrics auto-table will not render for executive summaries.
+    kpiData: {},
+    growthData: {},
+
+    timelineData,
+    projectStatusData,
+    projectCount,
+    activeProjects,
+    completionRate,
+    activityCount,
+    totalEvents,
+    avgDailyEvents,
+    insights,
+    recommendations,
+    reportSummary: getTypeSummary(REPORT_TYPES.EXECUTIVE_SUMMARY),
+    teamSummary,
+  }
+}
+
 export async function generateReport({ companyId, type, title, userId }) {
   if (!companyId) throw new Error('company_id is required')
   if (!type) throw new Error('report_type is required')
 
-  const dateRange = await getDateRangeForType(type)
   const reportTitle = title || getDefaultTitle(type)
-
   if (!reportTitle) throw new Error('title is required')
 
-  analyticsService.setCompanyId(companyId)
-
-  try {
-    const activityPageSize = type === REPORT_TYPES.TEAM_PRODUCTIVITY ? 1000 : 100
-
-    const [kpiData, growthData, timelineData, projectStatusData, activityLogsResult] = await Promise.all([
-      analyticsService.getKpiMetrics(dateRange.startDate, dateRange.endDate).catch(() => ({ ...EMPTY_KPI })),
-      analyticsService.getGrowthMetrics(dateRange.startDate, dateRange.endDate).catch(() => ({ ...EMPTY_GROWTH })),
-      analyticsService.getActivityTimeline(dateRange.startDate, dateRange.endDate).catch(() => []),
-      analyticsService.getProjectStatus().catch(() => []),
-      fetchActivityLogs({ companyId, pageSize: activityPageSize, startDate: dateRange.startDate, endDate: dateRange.endDate }).catch(() => ({ logs: [], totalCount: 0 })),
-    ])
-
-    const projects = await getProjects(companyId).catch(() => [])
-    const projectCount = Array.isArray(projects) ? projects.length : 0
-    const activityCount = activityLogsResult?.totalCount || 0
-    const totalEvents = Object.values(kpiData).reduce((a, b) => a + b, 0)
-
-    const insights = generateInsights(kpiData, growthData, projectCount, activityCount, type)
-    const recommendations = generateRecommendations(kpiData, growthData, projectCount, activityCount, type)
-
-    let content = {
-      generatedAt: new Date().toISOString(),
-      dateRange,
-      kpiData,
-      growthData,
-      timelineData,
-      projectStatusData,
-      projectCount,
-      activityCount,
-      totalEvents,
-      insights,
-      recommendations,
-      reportSummary: getTypeSummary(type),
-      teamSummary: buildTeamSummary(type, projectCount, totalEvents, activityCount, kpiData),
-    }
-
-    if (type === REPORT_TYPES.TEAM_PRODUCTIVITY && activityLogsResult.logs?.length > 0) {
-      content.teamActivity = await computeTeamActivity(activityLogsResult.logs)
-      if (content.teamActivity.length > 0) {
-        const top = content.teamActivity[0]
-        insights.push(`Top contributor: ${top.name} with ${top.totalActions} actions during this period.`)
-      }
-    }
-
-    if (!validateGeneratedContent(content)) {
-      content = generateFallbackContent({ type, projects, kpiData, growthData, timelineData, projectStatusData, activityCount, totalEvents, dateRange })
-
-      if (!validateGeneratedContent(content)) {
-        throw new Error('Failed to generate sufficient report content')
-      }
-    }
-
-    const { data, error } = await supabase
-      .from('generated_reports')
-      .insert({
-        company_id: companyId,
-        report_type: type,
-        title: reportTitle,
-        content,
-        created_by: userId || null,
-      })
-      .select()
-      .maybeSingle()
-
-    if (error) throw error
-    if (!data) throw new Error('Failed to save report')
-
-    return data
-  } catch (error) {
-    throw error
+  let content
+  switch (type) {
+    case REPORT_TYPES.WEEKLY:
+      content = await generateWeeklyReport({ companyId })
+      break
+    case REPORT_TYPES.MONTHLY:
+      content = await generateMonthlyReport({ companyId })
+      break
+    case REPORT_TYPES.TEAM_PRODUCTIVITY:
+      content = await generateTeamProductivityReport({ companyId })
+      break
+    case REPORT_TYPES.EXECUTIVE_SUMMARY:
+      content = await generateExecutiveSummaryReport({ companyId })
+      break
+    default:
+      throw new Error(`Unknown report type: ${type}`)
   }
+
+  // Temporary logs for tracing and validation (mandatory per spec)
+  const reportType = type
+  const dateRange = content?.dateRange
+  console.log('[Report Builder] reportType:', reportType)
+  console.log('[Report Builder] dateRange:', dateRange)
+  console.log('[Report Builder] generated report.content:', JSON.stringify(content, null, 2))
+
+  if (!validateGeneratedContent(content)) {
+    console.warn('[reportsService] Generated content validation produced low text volume, proceeding with available data', { type })
+  }
+
+  // Trace what will be inserted into Supabase
+  console.log('[Supabase Insert] generated_reports payload:', JSON.stringify({
+    company_id: companyId,
+    report_type: type,
+    title: reportTitle,
+    contentPreview: content && typeof content === 'object' ? {
+      keys: Object.keys(content),
+      dateRange: content?.dateRange,
+    } : content,
+  }, null, 2))
+
+  const { data, error } = await supabase
+    .from('generated_reports')
+    .insert({
+      company_id: companyId,
+      report_type: type,
+      title: reportTitle,
+      content,
+      created_by: userId || null,
+    })
+    .select()
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) throw new Error('Failed to save report')
+
+  console.log('[Supabase Insert] inserted report.content:', JSON.stringify(data?.content, null, 2))
+  return data
 }
 
 export async function fetchReports({ companyId, page = 1, pageSize = 10, type }) {

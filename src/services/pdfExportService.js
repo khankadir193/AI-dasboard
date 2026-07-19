@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 
 function sanitizeText(text) {
   if (!text) return ''
@@ -26,11 +26,67 @@ function formatDate(dateStr) {
   })
 }
 
+function formatPeriodLabel(dateRange) {
+  if (!dateRange || !dateRange.startDate || !dateRange.endDate) return null
+  const start = new Date(dateRange.startDate)
+  const end = new Date(dateRange.endDate)
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null
+  const shortOpts = { month: 'short', day: 'numeric' }
+  const fullOpts = { month: 'short', day: 'numeric', year: 'numeric' }
+  if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
+    return `${start.toLocaleDateString('en-US', shortOpts)} – ${end.getDate()}, ${end.getFullYear()}`
+  }
+  return `${start.toLocaleDateString('en-US', shortOpts)} – ${end.toLocaleDateString('en-US', fullOpts)}`
+}
+
+function isEffectivelyEmpty(content) {
+  if (!content || typeof content !== 'object') return true
+  if (content.projectCount > 0) return false
+  if (content.totalEvents > 0) return false
+  if (content.activityCount > 0) return false
+  if (content.kpiData && typeof content.kpiData === 'object' && Object.values(content.kpiData).some(v => v > 0)) return false
+  return true
+}
+
 export function exportReportToPDF(report, company) {
   if (!report) throw new Error('Report data is required')
-  if (!report.content || typeof report.content !== 'object') {
-    report = { ...report, content: { generatedAt: new Date().toISOString(), dateRange: null, kpiData: {}, growthData: {}, timelineData: [], projectStatusData: [], projectCount: 0, activityCount: 0, totalEvents: 0, insights: ['Report content is being generated. Please wait for the report to complete before exporting.'], recommendations: ['Try exporting again after the report has finished generating.'], reportSummary: '', teamSummary: 'Report data is being prepared. Please try exporting again shortly.' } }
+
+  if (!report.content) {
+    console.warn('[PDF Export] Report content is null/undefined, using empty data', {
+      reportId: report?.id,
+      reportType: report?.report_type,
+    })
+    report = { ...report, content: {} }
+  } else if (typeof report.content === 'string') {
+    try {
+      const parsed = JSON.parse(report.content)
+      report = { ...report, content: parsed && typeof parsed === 'object' ? parsed : {} }
+    } catch {
+      console.warn('[PDF Export] Report content is a string that could not be parsed as JSON, using empty data', {
+        reportId: report?.id,
+        contentType: typeof report.content,
+      })
+      report = { ...report, content: {} }
+    }
   }
+
+  const content = report.content
+  content.generatedAt = content.generatedAt || report.created_at || new Date().toISOString()
+  content.dateRange = content.dateRange || null
+  content.kpiData = content.kpiData || {}
+  content.growthData = content.growthData || {}
+  content.timelineData = content.timelineData || []
+  content.projectStatusData = content.projectStatusData || []
+  content.projectCount = content.projectCount ?? 0
+  content.activeProjects = content.activeProjects ?? 0
+  content.completionRate = content.completionRate ?? 0
+  content.activityCount = content.activityCount ?? 0
+  content.totalEvents = content.totalEvents ?? 0
+  content.avgDailyEvents = content.avgDailyEvents ?? 0
+  content.insights = content.insights || []
+  content.recommendations = content.recommendations || []
+  content.reportSummary = content.reportSummary || ''
+  content.teamSummary = content.teamSummary || ''
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -85,7 +141,7 @@ export function exportReportToPDF(report, company) {
   doc.text(`Report Type: ${sanitizeText(report.report_type || 'N/A')}`, margin, y)
   y += 5
   const periodLabel = report.content?.dateRange
-    ? `${sanitizeText(report.content.dateRange.startDate)} — ${sanitizeText(report.content.dateRange.endDate)}`
+    ? formatPeriodLabel(report.content.dateRange) || 'N/A'
     : 'N/A'
   doc.text(`Period: ${periodLabel}`, margin, y)
   y += 8
@@ -93,8 +149,6 @@ export function exportReportToPDF(report, company) {
   doc.setDrawColor(200, 200, 200)
   doc.line(margin, y, pageWidth - margin, y)
   y += 6
-
-  const content = report.content || {}
 
   if (content.teamSummary) {
     checkPageBreak(12)
@@ -146,7 +200,7 @@ export function exportReportToPDF(report, company) {
         return [sanitizeText(label), String(value), growthStr]
       })
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [['Metric', 'Count', 'Change']],
       body: kpiRows,
@@ -217,7 +271,7 @@ export function exportReportToPDF(report, company) {
       return [sanitizeText(item.name || 'Unknown'), String(item.value || 0)]
     })
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [['Status', 'Count']],
       body: statusRows,
@@ -244,7 +298,7 @@ export function exportReportToPDF(report, company) {
       String(member.logins || 0),
     ])
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [['Team Member', 'Actions', 'Projects Created', 'Logins']],
       body: teamRows,
@@ -268,22 +322,31 @@ export function exportReportToPDF(report, company) {
     doc.line(margin, y, pageWidth - margin, y)
     y += 6
 
-    doc.setFontSize(8)
-    doc.setTextColor(120, 120, 120)
-    doc.text(`Total Projects: ${content.projectCount || 0}`, margin, y)
-    y += 4
-    if (content.activeProjects !== undefined) {
-      doc.text(`Active Projects: ${content.activeProjects}`, margin, y)
+    if (isEffectivelyEmpty(content)) {
+      doc.setFontSize(10)
+      doc.setTextColor(140, 140, 140)
+      doc.text('No activity recorded in this period.', margin, y)
+      y += 6
+    } else {
+      doc.setFontSize(8)
+      doc.setTextColor(120, 120, 120)
+      doc.text(`Total Projects: ${content.projectCount || 0}`, margin, y)
+      y += 4
+      if (content.activeProjects !== undefined) {
+        doc.text(`Active Projects: ${content.activeProjects}`, margin, y)
+        y += 4
+      }
+      if (content.completionRate !== undefined) {
+        doc.text(`Completion Rate: ${content.completionRate}%`, margin, y)
+        y += 4
+      }
+      doc.text(`Total Events Tracked: ${content.totalEvents || 0}`, margin, y)
+      y += 4
+      doc.text(`Avg Daily Events: ${content.avgDailyEvents || 0}`, margin, y)
+      y += 4
+      doc.text(`Activity Log Entries: ${content.activityCount || 0}`, margin, y)
       y += 4
     }
-    if (content.completionRate !== undefined) {
-      doc.text(`Completion Rate: ${content.completionRate}%`, margin, y)
-      y += 4
-    }
-    doc.text(`Total Events Tracked: ${content.totalEvents || 0}`, margin, y)
-    y += 4
-    doc.text(`Activity Log Entries: ${content.activityCount || 0}`, margin, y)
-    y += 4
     doc.text(`Report Generated: ${formatDate(content.generatedAt)}`, margin, y)
   }
 

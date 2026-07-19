@@ -27,12 +27,15 @@ class AnalyticsService {
     }
   }
 
-  async _fetchRawData(startDate, endDate) {
-    this._requireCompany()
+  async _fetchRawData(startDate, endDate, companyId) {
+    const cid = companyId || this.currentCompanyId
+    if (!cid) {
+      throw new Error('Company ID not set. Please authenticate first.')
+    }
     const { data, error } = await supabase
       .from('analytics_data')
       .select('*')
-      .eq('company_id', this.currentCompanyId)
+      .eq('company_id', cid)
       .gte('metric_date', startDate)
       .lte('metric_date', endDate)
       .order('metric_date', { ascending: true })
@@ -79,20 +82,20 @@ class AnalyticsService {
       .slice(0, limit)
   }
 
-  async getKpiMetrics(startDate, endDate) {
-    const rows = await this._fetchRawData(startDate, endDate)
+  async getKpiMetrics(startDate, endDate, companyId) {
+    const rows = await this._fetchRawData(startDate, endDate, companyId)
     return this._aggregateKPI(rows)
   }
 
-  async getGrowthMetrics(startDate, endDate) {
+  async getGrowthMetrics(startDate, endDate, companyId) {
     const rangeMs = new Date(endDate) - new Date(startDate)
     const prevEnd = new Date(new Date(startDate).getTime() - 86400000)
     const prevStart = new Date(prevEnd.getTime() - rangeMs)
     const fmt = d => d.toISOString().split('T')[0]
 
     const [currentRows, previousRows] = await Promise.all([
-      this._fetchRawData(startDate, endDate),
-      this._fetchRawData(fmt(prevStart), fmt(prevEnd))
+      this._fetchRawData(startDate, endDate, companyId),
+      this._fetchRawData(fmt(prevStart), fmt(prevEnd), companyId)
     ])
 
     const currKpi = this._aggregateKPI(currentRows)
@@ -107,8 +110,8 @@ class AnalyticsService {
     }
   }
 
-  async getActivityTimeline(startDate, endDate) {
-    const rows = await this._fetchRawData(startDate, endDate)
+  async getActivityTimeline(startDate, endDate, companyId) {
+    const rows = await this._fetchRawData(startDate, endDate, companyId)
     return this._buildTimeline(rows)
   }
 
@@ -156,13 +159,16 @@ class AnalyticsService {
     return distribution
   }
 
-  async getProjectStatus() {
-    this._requireCompany()
+  async getProjectStatus(companyId) {
+    const cid = companyId || this.currentCompanyId
+    if (!cid) {
+      throw new Error('Company ID not set. Please authenticate first.')
+    }
 
     const { data: projects, error } = await supabase
       .from('projects')
       .select('status')
-      .eq('company_id', this.currentCompanyId)
+      .eq('company_id', cid)
 
     if (error) throw error
 
