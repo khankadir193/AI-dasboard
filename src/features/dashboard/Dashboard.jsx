@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
+import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 
 // Local imports
@@ -39,6 +40,7 @@ function DashboardContent() {
 
   const { data: analyticsData, isLoading, error, refetch } = useDashboardAnalytics(dateRange)
   const { trialInfo = { isLoading: false, trialEnd: null, isExpired: false, daysLeft: 0 } } = useTrial()
+  const queryClient = useQueryClient()
   const { pathname } = useLocation()
   const locationKey = useLocation().key
 
@@ -67,6 +69,9 @@ function DashboardContent() {
       companyId: profile.company_id,
       type: 'dashboard_view',
       value: 1
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['dashboardAnalytics', profile.company_id] })
+      queryClient.invalidateQueries({ queryKey: ['recentActivity', profile.company_id] })
     })
 
     logActivity({

@@ -5,6 +5,7 @@ import {
   deleteProject as deleteProjectApi,
   updateProject as updateProjectApi
 } from '../../services/projectsService'
+import { queryClient } from '../../lib/queryClient'
 import { trackEvent } from '../../features/analytics/trackEvent'
 import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
 import { createNotification } from '../../services/notificationsService'
@@ -49,6 +50,9 @@ export const createProject = createAsyncThunk(
           companyId,
           type: 'projects_created',
           value: 1
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['dashboardAnalytics', companyId] })
+          queryClient.invalidateQueries({ queryKey: ['recentActivity', companyId] })
         })
 
         logActivity({
@@ -100,6 +104,9 @@ export const deleteProject = createAsyncThunk(
           companyId,
           type: 'projects_deleted',
           value: 1
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['dashboardAnalytics', companyId] })
+          queryClient.invalidateQueries({ queryKey: ['recentActivity', companyId] })
         })
 
         logActivity({
@@ -151,6 +158,9 @@ export const updateProject = createAsyncThunk(
           companyId,
           type: 'projects_updated',
           value: 1
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['dashboardAnalytics', companyId] })
+          queryClient.invalidateQueries({ queryKey: ['recentActivity', companyId] })
         })
 
         logActivity({

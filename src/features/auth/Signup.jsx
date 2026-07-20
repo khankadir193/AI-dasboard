@@ -42,8 +42,19 @@ export default function SignUp() {
       )
     }
 
+    // Prevent auto-redirect to dashboard by signing out if session was auto-created
+    if (data?.session) {
+      await supabase.auth.signOut()
+    }
+
     // Always redirect to signin after signup
-    navigate('/signin', { replace: true })
+    navigate('/signin', {
+      replace: true,
+      state: {
+        message: 'Account created successfully. Please sign in to continue.',
+        email
+      }
+    })
   }
 
   return (

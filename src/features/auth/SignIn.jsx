@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { trackEvent } from '../analytics/trackEvent'
+import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
 
 
 export default function SignIn() {
@@ -46,6 +48,28 @@ export default function SignIn() {
     if (!data?.session) {
       setInfo('Sign-in succeeded but no active session was created. Please try again.')
       return
+    }
+
+    const { data: signInProfile } = await supabase
+      .from('profiles')
+      .select('id, company_id, role')
+      .eq('id', data.session.user.id)
+      .maybeSingle()
+
+    if (signInProfile?.company_id) {
+      trackEvent({
+        companyId: signInProfile.company_id,
+        type: 'active_users',
+        value: 1
+      })
+      logActivity({
+        companyId: signInProfile.company_id,
+        userId: signInProfile.id,
+        action: ACTIONS.LOGIN,
+        resourceType: RESOURCE_TYPES.AUTH,
+        description: 'User logged in',
+        metadata: { role: signInProfile.role }
+      })
     }
 
     const redirectParam = new URLSearchParams(location.search).get('redirect')

@@ -7,7 +7,6 @@ import { clearProfile, fetchUserProfile } from '../store/slices/profileSlice'
 import { clearTenant } from '../store/slices/tenantSlice'
 import { clearProjects } from '../store/slices/projectsSlice'
 import FullScreenLoader from '../components/common/FullScreenLoader'
-import { trackEvent } from '../features/analytics/trackEvent'
 import { logActivity, ACTIONS, RESOURCE_TYPES } from '../services/activityLogService'
 import { ensureFeatureFlags } from '../services/featureFlagService'
 
@@ -50,8 +49,6 @@ export default function AuthProvider({ children }) {
     currentUserIdRef.current = userInStore?.id ?? null
   }, [userInStore?.id])
 
-  const loginTrackedRef = useRef(false)
-  const pendingSignInRef = useRef(false)
   const profileRecoveryFailedRef = useRef(false)
 
   const attemptProfileFetch = (userId) => {
@@ -163,7 +160,6 @@ export default function AuthProvider({ children }) {
         if (event === 'SIGNED_OUT') {
           const cid = latestProfileIdRef.current
           const uid = currentUserIdRef.current
-          loginTrackedRef.current = false
           currentUserIdRef.current = null
           lastFetchedIdRef.current = null
           profileRetryCountRef.current = 0
@@ -188,7 +184,6 @@ export default function AuthProvider({ children }) {
           handleAuthWithProfile(session)
         }
         if (event === 'SIGNED_IN') {
-          pendingSignInRef.current = true
           handleAuthWithProfile(session)
         }
       }
@@ -208,30 +203,6 @@ export default function AuthProvider({ children }) {
       }
     }
   }, [])
-
-  useEffect(() => {
-    if (!profileInStore?.company_id) return
-    if (!pendingSignInRef.current) return
-    if (loginTrackedRef.current) return
-
-    loginTrackedRef.current = true
-    pendingSignInRef.current = false
-
-    trackEvent({
-      companyId: profileInStore.company_id,
-      type: 'active_users',
-      value: 1
-    })
-
-    logActivity({
-      companyId: profileInStore.company_id,
-      userId: profileInStore.id,
-      action: ACTIONS.LOGIN,
-      resourceType: RESOURCE_TYPES.AUTH,
-      description: 'User logged in',
-      metadata: { role: profileInStore.role }
-    })
-  }, [profileInStore?.company_id])
 
   useEffect(() => {
     if (!profileInStore?.company_id) return
