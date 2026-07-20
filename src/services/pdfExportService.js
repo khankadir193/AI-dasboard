@@ -48,6 +48,30 @@ function isEffectivelyEmpty(content) {
   return true
 }
 
+function addSectionHeader(doc, margin, yPos, text, accentColor) {
+  doc.setFillColor(...accentColor)
+  doc.rect(margin, yPos - 1, 3, 10, 'F')
+  doc.setFontSize(13)
+  doc.setFont(undefined, 'bold')
+  doc.setTextColor(30, 30, 30)
+  doc.text(text, margin + 8, yPos + 3)
+  return yPos + 10
+}
+
+const KPI_LABELS = {
+  activeUsers: 'User Logins',
+  projectsCreated: 'Projects Created',
+  projectsUpdated: 'Projects Updated',
+  projectsDeleted: 'Projects Deleted',
+  dashboardViews: 'Dashboard Views',
+}
+
+const BLUE = [59, 130, 246]
+const AMBER = [245, 158, 11]
+const GREEN = [16, 185, 129]
+const RED = [239, 68, 68]
+const GRAY_TEXT = [100, 100, 100]
+
 export function exportReportToPDF(report, company) {
   if (!report) throw new Error('Report data is required')
 
@@ -98,7 +122,7 @@ export function exportReportToPDF(report, company) {
   const companyName = sanitizeText(company?.name || 'InsightAI')
 
   const addHeader = () => {
-    doc.setFillColor(59, 130, 246)
+    doc.setFillColor(...BLUE)
     doc.rect(0, 0, pageWidth, 14, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(8)
@@ -117,7 +141,7 @@ export function exportReportToPDF(report, company) {
     doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, footerY + 5, { align: 'right' })
   }
 
-  const checkPageBreak = (needed) => {
+  const checkSpace = (needed) => {
     if (y + needed > pageHeight - 15) {
       addFooter()
       doc.addPage()
@@ -137,8 +161,9 @@ export function exportReportToPDF(report, company) {
 
   doc.setFontSize(9)
   doc.setFont(undefined, 'normal')
-  doc.setTextColor(100, 100, 100)
-  doc.text(`Report Type: ${sanitizeText(report.report_type || 'N/A')}`, margin, y)
+  doc.setTextColor(...GRAY_TEXT)
+  const typeLabel = sanitizeText(report.report_type || 'N/A').replace(/_/g, ' ')
+  doc.text(`Report Type: ${typeLabel}`, margin, y)
   y += 5
   const periodLabel = report.content?.dateRange
     ? formatPeriodLabel(report.content.dateRange) || 'N/A'
@@ -151,50 +176,34 @@ export function exportReportToPDF(report, company) {
   y += 6
 
   if (content.teamSummary) {
-    checkPageBreak(12)
-    doc.setFontSize(13)
-    doc.setFont(undefined, 'bold')
-    doc.setTextColor(30, 30, 30)
-    doc.text('Executive Summary', margin, y)
-    y += 7
+    checkSpace(12)
     doc.setFontSize(10)
     doc.setFont(undefined, 'normal')
     doc.setTextColor(80, 80, 80)
     const summaryLines = doc.splitTextToSize(sanitizeText(content.teamSummary), contentWidth)
     doc.text(summaryLines, margin, y)
-    y += summaryLines.length * 5 + 4
-  }
-
-  const kpiLabels = {
-    activeUsers: 'User Logins',
-    projectsCreated: 'Projects Created',
-    projectsUpdated: 'Projects Updated',
-    projectsDeleted: 'Projects Deleted',
-    dashboardViews: 'Dashboard Views',
+    y += summaryLines.length * 5 + 6
   }
 
   if (content.reportSummary) {
-    checkPageBreak(14)
-    doc.setFontSize(10)
+    checkSpace(14)
+    doc.setFontSize(9)
     doc.setFont(undefined, 'normal')
     doc.setTextColor(90, 90, 90)
     const summaryLines = doc.splitTextToSize(sanitizeText(content.reportSummary), contentWidth)
     doc.text(summaryLines, margin, y)
-    y += summaryLines.length * 5 + 6
+    y += summaryLines.length * 4 + 6
   }
 
-  if (content.kpiData && Object.values(content.kpiData).some(v => v > 0)) {
-    checkPageBreak(30)
-    doc.setFontSize(13)
-    doc.setFont(undefined, 'bold')
-    doc.setTextColor(30, 30, 30)
-    doc.text('Key Metrics', margin, y)
-    y += 7
+  const hasKpi = content.kpiData && Object.values(content.kpiData).some(v => v > 0)
+  if (hasKpi) {
+    checkSpace(30)
+    y = addSectionHeader(doc, margin, y, 'Key Metrics', BLUE)
 
     const kpiRows = Object.entries(content.kpiData)
       .filter(([, value]) => value > 0)
       .map(([key, value]) => {
-        const label = kpiLabels[key] || key
+        const label = KPI_LABELS[key] || key
         const growth = content.growthData?.[key]
         const growthStr = growth !== undefined ? `${growth > 0 ? '+' : ''}${growth}%` : '—'
         return [sanitizeText(label), String(value), growthStr]
@@ -205,7 +214,7 @@ export function exportReportToPDF(report, company) {
       head: [['Metric', 'Count', 'Change']],
       body: kpiRows,
       theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+      headStyles: { fillColor: [...BLUE], fontSize: 9 },
       bodyStyles: { fontSize: 8 },
       columnStyles: {
         0: { cellWidth: contentWidth * 0.5 },
@@ -214,82 +223,133 @@ export function exportReportToPDF(report, company) {
       },
       margin: { left: margin, right: margin },
     })
-    y = doc.lastAutoTable.finalY + 8
+    y = doc.lastAutoTable.finalY + 10
+  }
+
+  const hasGrowth = content.growthData && Object.values(content.growthData).some(v => v !== 0)
+  if (hasGrowth) {
+    checkSpace(24)
+    y = addSectionHeader(doc, margin, y, 'Growth vs Previous Period', GREEN)
+
+    const growthRows = Object.entries(content.growthData)
+      .filter(([, value]) => value !== 0)
+      .map(([key, value]) => {
+        const label = KPI_LABELS[key] || key
+        const sign = value > 0 ? '+' : ''
+        const arrow = value > 0 ? ' ▲' : ' ▼'
+        return [sanitizeText(label), `${sign}${value}%${arrow}`]
+      })
+
+    if (growthRows.length > 0) {
+      autoTable(doc, {
+        startY: y,
+        head: [['Metric', 'Change']],
+        body: growthRows,
+        theme: 'striped',
+        headStyles: { fillColor: [...GREEN], fontSize: 9 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: contentWidth * 0.5 },
+          1: { cellWidth: contentWidth * 0.25, halign: 'center' },
+        },
+        margin: { left: margin, right: margin },
+      })
+      y = doc.lastAutoTable.finalY + 10
+    }
+  }
+
+  if (content.timelineData && content.timelineData.length > 0) {
+    checkSpace(24)
+    y = addSectionHeader(doc, margin, y, 'Activity Timeline', BLUE)
+
+    const maxTimelineRows = 14
+    const timelineRows = content.timelineData
+      .slice(-maxTimelineRows)
+      .map(item => [
+        sanitizeText(item.date || '—'),
+        String(item.count ?? 0),
+      ])
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Date', 'Events']],
+      body: timelineRows,
+      theme: 'striped',
+      headStyles: { fillColor: [...BLUE], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: contentWidth * 0.5, halign: 'center' },
+        1: { cellWidth: contentWidth * 0.25, halign: 'center' },
+      },
+      margin: { left: margin, right: margin },
+    })
+    y = doc.lastAutoTable.finalY + 10
   }
 
   if (content.insights && content.insights.length > 0) {
-    checkPageBreak(content.insights.length * 6 + 14)
-    doc.setFontSize(13)
-    doc.setFont(undefined, 'bold')
-    doc.setTextColor(30, 30, 30)
-    doc.text('Insights', margin, y)
-    y += 7
+    checkSpace(content.insights.length * 6 + 14)
+    y = addSectionHeader(doc, margin, y, 'Insights', BLUE)
 
     doc.setFont(undefined, 'normal')
     doc.setFontSize(9)
-    doc.setTextColor(60, 60, 60)
+    doc.setTextColor(50, 50, 50)
 
-    content.insights.forEach((insight) => {
-      checkPageBreak(6)
-      const lines = doc.splitTextToSize(`• ${sanitizeText(insight)}`, contentWidth - 4)
-      doc.text(lines, margin + 2, y)
+    content.insights.forEach((insight, i) => {
+      checkSpace(6)
+      const prefix = `${i + 1}.  `
+      const indent = margin + 6
+      const availableWidth = contentWidth - 8
+      const lines = doc.splitTextToSize(prefix + sanitizeText(insight), availableWidth)
+      doc.text(lines, indent, y)
       y += lines.length * 5 + 1
     })
-    y += 4
+    y += 6
   }
 
   if (content.recommendations && content.recommendations.length > 0) {
-    checkPageBreak(content.recommendations.length * 12 + 14)
-    doc.setFontSize(13)
-    doc.setFont(undefined, 'bold')
-    doc.setTextColor(30, 30, 30)
-    doc.text('Recommendations', margin, y)
-    y += 7
+    checkSpace(content.recommendations.length * 6 + 14)
+    y = addSectionHeader(doc, margin, y, 'Recommendations', AMBER)
 
     doc.setFont(undefined, 'normal')
     doc.setFontSize(9)
-    doc.setTextColor(60, 60, 60)
+    doc.setTextColor(60, 50, 30)
 
-    content.recommendations.forEach((rec) => {
-      const lines = doc.splitTextToSize(`• ${sanitizeText(rec)}`, contentWidth - 4)
-      checkPageBreak(lines.length * 5 + 1)
-      doc.text(lines, margin + 2, y)
+    content.recommendations.forEach((rec, i) => {
+      checkSpace(6)
+      const prefix = `${i + 1}.  `
+      const indent = margin + 6
+      const availableWidth = contentWidth - 8
+      const lines = doc.splitTextToSize(prefix + sanitizeText(rec), availableWidth)
+      doc.text(lines, indent, y)
       y += lines.length * 5 + 1
     })
-    y += 4
+    y += 6
   }
 
   if (content.projectStatusData && content.projectStatusData.length > 0) {
-    checkPageBreak(content.projectStatusData.length * 8 + 14)
-    doc.setFontSize(13)
-    doc.setFont(undefined, 'bold')
-    doc.setTextColor(30, 30, 30)
-    doc.text('Project Statistics', margin, y)
-    y += 7
+    checkSpace(content.projectStatusData.length * 8 + 14)
+    y = addSectionHeader(doc, margin, y, 'Project Statistics', BLUE)
 
-    const statusRows = content.projectStatusData.map((item) => {
-      return [sanitizeText(item.name || 'Unknown'), String(item.value || 0)]
-    })
+    const statusRows = content.projectStatusData.map((item) => [
+      sanitizeText(item.name || 'Unknown'),
+      String(item.value || 0),
+    ])
 
     autoTable(doc, {
       startY: y,
       head: [['Status', 'Count']],
       body: statusRows,
       theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+      headStyles: { fillColor: [...BLUE], fontSize: 9 },
       bodyStyles: { fontSize: 8 },
       margin: { left: margin, right: margin },
     })
-    y = doc.lastAutoTable.finalY + 8
+    y = doc.lastAutoTable.finalY + 10
   }
 
   if (content.teamActivity && content.teamActivity.length > 0) {
-    checkPageBreak(content.teamActivity.length * 8 + 14)
-    doc.setFontSize(13)
-    doc.setFont(undefined, 'bold')
-    doc.setTextColor(30, 30, 30)
-    doc.text('Team Activity', margin, y)
-    y += 7
+    checkSpace(content.teamActivity.length * 8 + 14)
+    y = addSectionHeader(doc, margin, y, 'Team Activity', BLUE)
 
     const teamRows = content.teamActivity.map((member) => [
       sanitizeText(member.name || 'Unknown'),
@@ -303,7 +363,7 @@ export function exportReportToPDF(report, company) {
       head: [['Team Member', 'Actions', 'Projects Created', 'Logins']],
       body: teamRows,
       theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+      headStyles: { fillColor: [...BLUE], fontSize: 9 },
       bodyStyles: { fontSize: 8 },
       columnStyles: {
         0: { cellWidth: contentWidth * 0.4 },
@@ -313,11 +373,11 @@ export function exportReportToPDF(report, company) {
       },
       margin: { left: margin, right: margin },
     })
-    y = doc.lastAutoTable.finalY + 8
+    y = doc.lastAutoTable.finalY + 10
   }
 
   {
-    checkPageBreak(14)
+    checkSpace(24)
     doc.setDrawColor(200, 200, 200)
     doc.line(margin, y, pageWidth - margin, y)
     y += 6
@@ -328,26 +388,33 @@ export function exportReportToPDF(report, company) {
       doc.text('No activity recorded in this period.', margin, y)
       y += 6
     } else {
+      const leftCol = [
+        `Projects: ${content.projectCount || 0}`,
+        `Active: ${content.activeProjects ?? 0}`,
+        `Completion Rate: ${content.completionRate ?? 0}%`,
+      ]
+      const rightCol = [
+        `Events Tracked: ${content.totalEvents || 0}`,
+        `Avg Daily: ${content.avgDailyEvents || 0}`,
+        `Activity Logs: ${content.activityCount || 0}`,
+      ]
+      const colWidth = contentWidth / 2
+
       doc.setFontSize(8)
-      doc.setTextColor(120, 120, 120)
-      doc.text(`Total Projects: ${content.projectCount || 0}`, margin, y)
-      y += 4
-      if (content.activeProjects !== undefined) {
-        doc.text(`Active Projects: ${content.activeProjects}`, margin, y)
-        y += 4
-      }
-      if (content.completionRate !== undefined) {
-        doc.text(`Completion Rate: ${content.completionRate}%`, margin, y)
-        y += 4
-      }
-      doc.text(`Total Events Tracked: ${content.totalEvents || 0}`, margin, y)
-      y += 4
-      doc.text(`Avg Daily Events: ${content.avgDailyEvents || 0}`, margin, y)
-      y += 4
-      doc.text(`Activity Log Entries: ${content.activityCount || 0}`, margin, y)
-      y += 4
+      doc.setTextColor(100, 100, 100)
+      doc.setFont(undefined, 'normal')
+
+      leftCol.forEach((line, i) => {
+        doc.text(line, margin, y + i * 4)
+      })
+      rightCol.forEach((line, i) => {
+        doc.text(line, margin + colWidth, y + i * 4)
+      })
+      y += leftCol.length * 4 + 2
     }
-    doc.text(`Report Generated: ${formatDate(content.generatedAt)}`, margin, y)
+    doc.setFontSize(7)
+    doc.setTextColor(120, 120, 120)
+    doc.text(`Generated: ${formatDate(content.generatedAt)}`, margin, y)
   }
 
   addFooter()

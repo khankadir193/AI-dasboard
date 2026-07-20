@@ -2,6 +2,7 @@ import { supabase } from '../../../lib/supabaseClient'
 import { analyticsService } from '../../../services/analyticsService'
 import { getProjects } from '../../../lib/projectsApi'
 import { fetchActivityLogs } from '../../../services/activityLogService'
+import { getAIInsight } from '../../../lib/apiClient'
 
 const REPORT_TYPES = {
   WEEKLY: 'weekly',
@@ -165,6 +166,108 @@ function generateRecommendations(kpiData, growthData, projectCount, activityCoun
   }
 
   return recommendations
+}
+
+async function generateAIReportContent(data, type) {
+  const {
+    kpiData, growthData, projectCount, activeProjects, completionRate,
+    activityCount, totalEvents, avgDailyEvents, dateRange, projectStatusData,
+    timelineData, teamActivity,
+  } = data
+
+  const kpiLines = [
+    `- User Logins: ${kpiData?.activeUsers ?? 0}`,
+    `- Projects Created: ${kpiData?.projectsCreated ?? 0}`,
+    `- Projects Updated: ${kpiData?.projectsUpdated ?? 0}`,
+    `- Projects Deleted: ${kpiData?.projectsDeleted ?? 0}`,
+    `- Dashboard Views: ${kpiData?.dashboardViews ?? 0}`,
+  ].join('\n')
+
+  const growthLines = growthData && Object.keys(growthData).length > 0
+    ? 'Growth vs Previous Period:\n' + Object.entries(growthData)
+        .map(([k, v]) => `- ${safeLabel(k)}: ${v > 0 ? '+' : ''}${v}%`)
+        .join('\n')
+    : ''
+
+  const statusLines = projectStatusData?.length
+    ? 'Project Status:\n' + projectStatusData.map(p => `- ${p.name}: ${p.value}`).join('\n')
+    : ''
+
+  const teamLines = teamActivity?.length
+    ? 'Top Team Contributors:\n' + teamActivity.slice(0, 5).map(m => `- ${m.name}: ${m.totalActions} actions (projects created: ${m.projectsCreated}, logins: ${m.logins})`).join('\n')
+    : ''
+
+  const typeLabels = {
+    weekly: 'Weekly Report',
+    monthly: 'Monthly Report',
+    team_productivity: 'Team Productivity Report',
+    executive_summary: 'Executive Summary',
+  }
+
+  const prompt = [
+    `Generate a ${typeLabels[type] || 'Business Report'}.`,
+    '',
+    `Period: ${dateRange?.startDate || 'N/A'} to ${dateRange?.endDate || 'N/A'}`,
+    '',
+    'KPI Snapshot:',
+    kpiLines,
+    '',
+    growthLines,
+    '',
+    `Projects: ${projectCount ?? 0} total, ${activeProjects ?? 0} active, ${completionRate ?? 0}% active rate`,
+    `Total Analytics Events: ${totalEvents ?? 0}`,
+    `Avg Daily Events: ${avgDailyEvents ?? 0}`,
+    `Activity Log Entries: ${activityCount ?? 0}`,
+    '',
+    statusLines,
+    teamLines ? '\n' + teamLines : '',
+    '',
+    'Return your analysis with two sections:',
+    '',
+    'INSIGHTS',
+    '• 3-5 bullet points analyzing trends, anomalies, and patterns in the data above. Highlight key metrics with **bold**.',
+    '',
+    'RECOMMENDATIONS',
+    '• 2-4 actionable next steps based on the data.',
+  ].filter(Boolean).join('\n')
+
+  try {
+    const response = await getAIInsight(prompt, { maxTokens: 800, temperature: 0.3 })
+    if (!response || response.length < 20) throw new Error('Empty AI response')
+
+    const lines = response.split('\n')
+    let recIdx = -1
+    for (let i = 0; i < lines.length; i++) {
+      if (/^recommendations?:?/i.test(lines[i].trim()) && lines[i].trim().length < 40) {
+        recIdx = i
+        break
+      }
+    }
+
+    const extract = (sectionLines) => sectionLines
+      .map(l => l.replace(/^[\s]*[•\-\*\d\.]+[\s\)]*/, '').trim())
+      .filter(l => l.length > 10)
+      .filter(l => !/^(insight|recommendation|analysis|data|based on|here |sure|according|the |this )/i.test(l))
+
+    const insightLines = recIdx >= 0 ? lines.slice(0, recIdx) : lines
+    const recLines = recIdx >= 0 ? lines.slice(recIdx + 1) : []
+    const insights = extract(insightLines)
+    const recommendations = extract(recLines)
+
+    if (insights.length >= 1 || recommendations.length >= 1) {
+      return {
+        insights: insights.length >= 1 ? insights : ['Activity levels are stable with no significant anomalies detected.'],
+        recommendations: recommendations.length >= 1 ? recommendations : ['Continue monitoring current metrics and maintain consistent team engagement.'],
+      }
+    }
+  } catch (err) {
+    console.warn('[Reports] AI generation failed, falling back to rule-based:', err.message)
+  }
+
+  return {
+    insights: generateInsights(kpiData || {}, growthData || {}, projectCount || 0, activityCount || 0, type),
+    recommendations: generateRecommendations(kpiData || {}, growthData || {}, projectCount || 0, activityCount || 0, type),
+  }
 }
 
 function buildTeamSummary(type, projectCount, totalEvents, activityCount, kpiData) {
@@ -344,8 +447,12 @@ async function generateWeeklyReport({ companyId }) {
     console.info('[Reports] Weekly report generated with no data for the selected period.')
   }
 
-  const insights = generateInsights(kpiData, {}, projectCount, activityCount, REPORT_TYPES.WEEKLY)
-  const recommendations = generateRecommendations(kpiData, {}, projectCount, activityCount, REPORT_TYPES.WEEKLY)
+  const aiContent = await generateAIReportContent({
+    kpiData, growthData: {}, projectCount, activeProjects, completionRate,
+    activityCount, totalEvents, avgDailyEvents, dateRange, projectStatusData,
+  }, REPORT_TYPES.WEEKLY)
+  const insights = aiContent.insights
+  const recommendations = aiContent.recommendations
 
   return {
     generatedAt: new Date().toISOString(),
@@ -392,8 +499,12 @@ async function generateMonthlyReport({ companyId }) {
     console.info('[Reports] Monthly report generated with no data for the selected period.')
   }
 
-  const insights = generateInsights(kpiData, growthData, projectCount, activityCount, REPORT_TYPES.MONTHLY)
-  const recommendations = generateRecommendations(kpiData, growthData, projectCount, activityCount, REPORT_TYPES.MONTHLY)
+  const aiContent = await generateAIReportContent({
+    kpiData, growthData, projectCount, activeProjects, completionRate,
+    activityCount, totalEvents, avgDailyEvents, dateRange, projectStatusData, timelineData,
+  }, REPORT_TYPES.MONTHLY)
+  const insights = aiContent.insights
+  const recommendations = aiContent.recommendations
 
   return {
     generatedAt: new Date().toISOString(),
@@ -438,19 +549,23 @@ async function generateTeamProductivityReport({ companyId }) {
     console.info('[Reports] Team Productivity report generated with no data for the selected period.')
   }
 
-  const insights = generateInsights(kpiData, {}, projectCount, activityCount, REPORT_TYPES.TEAM_PRODUCTIVITY)
-  const recommendations = generateRecommendations(kpiData, {}, projectCount, activityCount, REPORT_TYPES.TEAM_PRODUCTIVITY)
-
   // Required by your spec: group activity_logs by user_id and populate teamActivity.
   let teamActivity = []
   const logs = activityLogsResult?.logs || []
   if (logs.length > 0) {
     teamActivity = await computeTeamActivity(logs)
+  }
 
-    if (teamActivity.length > 0) {
-      const top = teamActivity[0]
-      insights.push(`Top contributor: ${top.name} with ${top.totalActions} actions during this period.`)
-    }
+  const aiContent = await generateAIReportContent({
+    kpiData, growthData: {}, projectCount, activeProjects, completionRate,
+    activityCount, totalEvents, avgDailyEvents, dateRange, projectStatusData, teamActivity,
+  }, REPORT_TYPES.TEAM_PRODUCTIVITY)
+  const insights = aiContent.insights
+  const recommendations = aiContent.recommendations
+
+  if (teamActivity.length > 0) {
+    const top = teamActivity[0]
+    insights.push(`Top contributor: ${top.name} with ${top.totalActions} actions during this period.`)
   }
 
   return {
@@ -501,8 +616,12 @@ async function generateExecutiveSummaryReport({ companyId }) {
 
   // Leadership-focused insights/recommendations (still derived from KPI/growth for now),
   // but we will not include raw KPI tables in the PDF to avoid KPI-only duplication.
-  const insights = generateInsights(kpiData, growthData, projectCount, activityCount, REPORT_TYPES.EXECUTIVE_SUMMARY)
-  const recommendations = generateRecommendations(kpiData, growthData, projectCount, activityCount, REPORT_TYPES.EXECUTIVE_SUMMARY)
+  const aiContent = await generateAIReportContent({
+    kpiData, growthData, projectCount, activeProjects, completionRate,
+    activityCount, totalEvents, avgDailyEvents, dateRange, projectStatusData, timelineData,
+  }, REPORT_TYPES.EXECUTIVE_SUMMARY)
+  const insights = aiContent.insights
+  const recommendations = aiContent.recommendations
 
   // Leadership summary: prioritize strategic themes over raw metrics list.
   const leadershipSummaryParts = []
@@ -516,10 +635,8 @@ async function generateExecutiveSummaryReport({ companyId }) {
     generatedAt: new Date().toISOString(),
     dateRange,
 
-    // IMPORTANT: avoid duplicating KPI-only output by removing KPI payloads
-    // so PDF Key Metrics auto-table will not render for executive summaries.
-    kpiData: {},
-    growthData: {},
+    kpiData,
+    growthData,
 
     timelineData,
     projectStatusData,
