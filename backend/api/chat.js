@@ -1,3 +1,4 @@
+import { buildSystemPrompt } from "../lib/systemPrompt.js";
 import Groq from "groq-sdk";
 
 export default async function handler(req, res) {
@@ -12,14 +13,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message } = req.body;
+    const { message, context } = req.body;
+    const systemPrompt = buildSystemPrompt(context);
 
     const groq = new Groq({
       apiKey: process.env.GROQ_API_KEY,
     });
 
     const response = await groq.chat.completions.create({
-      messages: [{ role: "user", content: message }],
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message },
+      ],
       model: "llama3-8b-8192",
     });
 

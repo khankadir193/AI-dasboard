@@ -3,12 +3,13 @@
  * Handles AI chat requests via Groq API proxy
  */
 
-import { SYSTEM_PROMPT } from "../lib/systemPrompt.js";
+import { buildSystemPrompt } from "../lib/systemPrompt.js";
 
 export async function registerChatRoutes(app) {
   app.post('/api/chat', async (req, res) => {
     try {
-      const { message } = req.body;
+      const { message, context } = req.body;
+      const systemPrompt = buildSystemPrompt(context);
 
       const { Groq } = await import('groq-sdk');
 
@@ -20,7 +21,7 @@ export async function registerChatRoutes(app) {
         messages: [
           {
             role: "system",
-            content: SYSTEM_PROMPT,
+            content: systemPrompt,
           },
           {
             role: "user",

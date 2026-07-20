@@ -17,6 +17,7 @@ export default function useAIChat({
     saveAssistantMessage,
     updateConversationTimestamp,
     refreshConversationList: externalRefreshConversationList,
+    companyId,
 }) {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -179,7 +180,7 @@ export default function useAIChat({
                     conversationId: activeConversationIdLocal,
                 });
 
-                const response = await sendPromptToAI(prompt);
+                const response = await sendPromptToAI(prompt, { companyId });
 
                 // eslint-disable-next-line no-console
                 console.log('[AIInsights][handleSend] AI backend resolved', {

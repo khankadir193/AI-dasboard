@@ -8,9 +8,13 @@ import useConversations from '../hooks/useConversations';
 import useMessages from '../hooks/useMessages';
 import { ANALYSIS_TYPES } from '../utils/analysisTypes';
 import { useMemo, useEffect, useState, useRef } from 'react';
+import { useSelector } from 'react-redux';
 import FeatureGate from '../../../components/auth/FeatureGate';
 
 function AIInsightsContent() {
+    const { profile } = useSelector((state) => state.profile);
+    const companyId = profile?.company_id;
+
     const [pageLoading, setPageLoading] = useState(true);
     const initialLoadDone = useRef(false);
     const historyLoadStarted = useRef(false);
@@ -60,6 +64,7 @@ function AIInsightsContent() {
         saveAssistantMessage,
         updateConversationTimestamp,
         refreshConversationList,
+        companyId,
     });
 
     const cards = useMemo(() => ANALYSIS_TYPES, []);
