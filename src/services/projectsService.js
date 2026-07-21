@@ -154,10 +154,14 @@ export const deleteProject = async (projectId) => {
     throw new Error('Project ID is required')
   }
 
+  const user = await getCurrentUser()
+  const profile = await getUserProfile(user.id)
+
   const { data, error } = await supabase
     .from('projects')
     .delete()
     .eq('id', projectId)
+    .eq('company_id', profile.company_id)
     .select()
     .maybeSingle()
 
@@ -187,10 +191,14 @@ export const updateProject = async (projectId, updates) => {
     throw new Error('Updates object is required')
   }
 
+  const user = await getCurrentUser()
+  const profile = await getUserProfile(user.id)
+
   const { data, error } = await supabase
     .from('projects')
     .update(updates)
     .eq('id', projectId)
+    .eq('company_id', profile.company_id)
     .select()
     .maybeSingle()
 

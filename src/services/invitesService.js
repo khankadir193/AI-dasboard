@@ -206,34 +206,39 @@ export const createInvite = async ({ email, role, companyId }) => {
   return toPendingRowShape(data)
 }
 
-export const cancelInvite = async ({ inviteId }) => {
+export const cancelInvite = async ({ inviteId, companyId }) => {
   if (!inviteId) throw new Error('Invite id missing')
 
   // Only cancel pending invites to prevent side effects on already-processed invites
-  const { data, error } = await supabase
+  let query = supabase
     .from('invites')
     .update({ status: 'cancelled' })
     .eq('id', inviteId)
     .eq('status', 'pending')
-    .select('id')
-    .maybeSingle()
+
+  if (companyId) query = query.eq('company_id', companyId)
+
+  const { data, error } = await query.select('id').maybeSingle()
 
   if (error) throw new Error(error.message || 'Failed to cancel invite')
   if (!data) throw new Error('Invite is no longer pending')
   return data
 }
 
-export const resendInvite = async ({ inviteId }) => {
+export const resendInvite = async ({ inviteId, companyId }) => {
   if (!inviteId) throw new Error('Invite id missing')
 
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
   // Only allow resending for pending invites — prevents reactivating accepted ones
-  const { data: existing, error: fetchErr } = await supabase
+  let fetchQuery = supabase
     .from('invites')
     .select('id, status')
     .eq('id', inviteId)
-    .maybeSingle()
+
+  if (companyId) fetchQuery = fetchQuery.eq('company_id', companyId)
+
+  const { data: existing, error: fetchErr } = await fetchQuery.maybeSingle()
 
   if (fetchErr) throw new Error(fetchErr.message || 'Failed to fetch invite')
   if (!existing) throw new Error('Invite not found')
@@ -241,13 +246,15 @@ export const resendInvite = async ({ inviteId }) => {
     throw new Error('Only pending invites can be resent')
   }
 
-  const { data, error } = await supabase
+  let updateQuery = supabase
     .from('invites')
     .update({ expires_at: expiresAt })
     .eq('id', inviteId)
     .eq('status', 'pending')
-    .select('id')
-    .maybeSingle()
+
+  if (companyId) updateQuery = updateQuery.eq('company_id', companyId)
+
+  const { data, error } = await updateQuery.select('id').maybeSingle()
 
   if (error) throw new Error(error.message || 'Failed to resend invite')
   if (!data) throw new Error('Invite is no longer pending')
@@ -257,14 +264,17 @@ export const resendInvite = async ({ inviteId }) => {
   return data
 }
 
-export const getInviteToken = async ({ inviteId }) => {
+export const getInviteToken = async ({ inviteId, companyId }) => {
   if (!inviteId) throw new Error('Invite id missing')
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('invites')
     .select('token, status')
     .eq('id', inviteId)
-    .maybeSingle()
+
+  if (companyId) query = query.eq('company_id', companyId)
+
+  const { data, error } = await query.maybeSingle()
 
   if (error) throw new Error(error.message || 'Failed to fetch invite link')
   if (!data?.token) throw new Error('Invite link unavailable')

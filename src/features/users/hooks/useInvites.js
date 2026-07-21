@@ -31,7 +31,7 @@ export function useInvites({ companyId, showToast }) {
   const handleResendInvite = useCallback(async (user) => {
     try {
       if (!user?.id) throw new Error('Invite id missing')
-      await resendInvite({ inviteId: user.id })
+      await resendInvite({ inviteId: user.id, companyId })
       await refreshPendingInvites()
       showToast('Invitation resent')
     } catch (err) {
@@ -42,7 +42,7 @@ export function useInvites({ companyId, showToast }) {
   const handleCancelInvite = useCallback(async (user) => {
     try {
       if (!user?.id) throw new Error('Invite id missing')
-      await cancelInvite({ inviteId: user.id })
+      await cancelInvite({ inviteId: user.id, companyId })
       await refreshPendingInvites()
       showToast('Invitation canceled')
     } catch (err) {
@@ -52,7 +52,7 @@ export function useInvites({ companyId, showToast }) {
 
   const handleCopyInviteLink = useCallback(async (user) => {
     try {
-      const token = user?.token || (await getInviteToken({ inviteId: user.id }))
+      const token = user?.token || (await getInviteToken({ inviteId: user.id, companyId }))
       const link = buildInviteUrl(token)
       await navigator.clipboard.writeText(link)
       showToast('Invite link copied')

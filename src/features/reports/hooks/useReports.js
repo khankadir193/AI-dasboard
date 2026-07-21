@@ -28,7 +28,7 @@ export function useReportById(reportId) {
   const companyId = profile?.company_id
 
   return useQuery({
-    queryKey: ['reports', 'detail', reportId],
+    queryKey: ['reports', 'detail', companyId, reportId],
     queryFn: () => getReportById(reportId),
     enabled: !!companyId && !!reportId,
     staleTime: 120000,
@@ -50,7 +50,7 @@ export function useGenerateReport() {
         userId: profile?.id,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['reports', profile?.company_id] })
     },
     retry: 1,
   })
@@ -58,11 +58,12 @@ export function useGenerateReport() {
 
 export function useDeleteReport() {
   const queryClient = useQueryClient()
+  const { profile } = useSelector((state) => state.profile)
 
   return useMutation({
     mutationFn: (reportId) => deleteReport(reportId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reports'] })
+      queryClient.invalidateQueries({ queryKey: ['reports', profile?.company_id] })
     },
     retry: 1,
   })

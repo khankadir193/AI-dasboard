@@ -750,13 +750,17 @@ export async function fetchReports({ companyId, page = 1, pageSize = 10, type })
   }
 }
 
-export async function deleteReport(reportId) {
+export async function deleteReport(reportId, companyId) {
   if (!reportId) throw new Error('Report ID is required')
 
-  const { error } = await supabase
+  let query = supabase
     .from('generated_reports')
     .delete()
     .eq('id', reportId)
+
+  if (companyId) query = query.eq('company_id', companyId)
+
+  const { error } = await query
 
   if (error) {
     throw new Error('Failed to delete report')
@@ -765,14 +769,17 @@ export async function deleteReport(reportId) {
   return true
 }
 
-export async function getReportById(reportId) {
+export async function getReportById(reportId, companyId) {
   if (!reportId) throw new Error('Report ID is required')
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('generated_reports')
     .select('*')
     .eq('id', reportId)
-    .maybeSingle()
+
+  if (companyId) query = query.eq('company_id', companyId)
+
+  const { data, error } = await query.maybeSingle()
 
   if (error) throw error
   if (!data) throw new Error('Report not found')

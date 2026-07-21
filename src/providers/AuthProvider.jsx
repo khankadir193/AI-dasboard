@@ -107,8 +107,7 @@ export default function AuthProvider({ children }) {
     dispatch(clearProfile())
     dispatch(clearTenant())
     dispatch(clearProjects())
-    queryClient.removeQueries({ queryKey: ['subscription'] })
-    queryClient.removeQueries({ queryKey: ['featureFlags'] })
+    queryClient.clear()
   }
 
   useEffect(() => {

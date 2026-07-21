@@ -43,11 +43,13 @@ export function useUnreadCount() {
 
 export function useMarkAsRead() {
   const queryClient = useQueryClient()
+  const { profile } = useSelector((state) => state.profile)
+  const companyId = profile?.company_id
 
   return useMutation({
     mutationFn: (notificationId) => markAsRead(notificationId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: ['notifications', companyId] })
     },
     retry: 1,
   })
@@ -61,7 +63,7 @@ export function useMarkAllAsRead() {
   return useMutation({
     mutationFn: () => markAllAsRead(companyId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: ['notifications', companyId] })
     },
     retry: 1,
   })

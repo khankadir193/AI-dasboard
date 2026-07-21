@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT } from "../backend/lib/systemPrompt.js";
+import { buildSystemPrompt } from "../backend/lib/systemPrompt.js";
 
 export default async function handler(req, res) {
   try {
@@ -12,7 +12,7 @@ export default async function handler(req, res) {
       return res.status(405).json({ message: "Method not allowed" });
     }
 
-    const { message } = req.body;
+    const { message, context } = req.body;
 
     const Groq = (await import("groq-sdk")).default;
 
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
       messages: [
         {
           role: "system",
-          content: SYSTEM_PROMPT,
+          content: buildSystemPrompt(context),
         },
         {
           role: "user",

@@ -86,8 +86,7 @@ export default function Header({ onMenuClick }) {
       dispatch(clearProfile())
       dispatch(clearTenant())
       dispatch(clearProjects())
-      queryClient.removeQueries({ queryKey: ['subscription'] })
-      queryClient.removeQueries({ queryKey: ['featureFlags'] })
+      queryClient.clear()
 
       await supabase.auth.signOut()
 

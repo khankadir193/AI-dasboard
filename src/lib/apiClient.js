@@ -17,23 +17,7 @@ export async function getAIInsight(prompt, options = {}) {
   const { model = GROQ_MODELS.BALANCED, maxTokens = 500, temperature = 0.7 } = options;
 
   try {
-    // System prompt for data analyst
-    const systemPrompt = `You are a data analyst assistant for a project management platform. Analyze the provided company data and answer the user's question based on the data.
-
-Structure your response EXACTLY as follows:
-
-## Summary
-[2-3 sentence executive summary of the key findings]
-
-## Findings
-[3-5 bullet-point findings with **bold** for key metrics]
-
-## Recommendations
-[2-4 actionable recommendations]
-
-Be specific, data-driven, and professional. Never invent data. Base all analysis strictly on the provided context.`;
-
-    const body = { message: systemPrompt + "\n\nData: " + prompt }
+    const body = { message: prompt }
     if (options.context) body.context = options.context
 
     const response = await fetch("/api/chat", {

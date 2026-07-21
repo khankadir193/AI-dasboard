@@ -28,12 +28,7 @@ class TenantApiService {
   // Analytics API methods
   async getAnalytics() {
     if (!this.currentTenantId) {
-      // Return mock data for demo purposes
-      return [
-        { id: '1', metric_name: 'total_users', value: 12430, created_at: new Date().toISOString() },
-        { id: '2', metric_name: 'completed_tasks', value: 89, created_at: new Date().toISOString() },
-        { id: '3', metric_name: 'total_tasks', value: 156, created_at: new Date().toISOString() }
-      ]
+      throw new Error('Company ID not set. Please authenticate first.')
     }
 
     try {
@@ -45,13 +40,15 @@ class TenantApiService {
       if (error) throw error
       return data || []
     } catch (error) {
-      console.warn('Analytics table not found, returning mock data:', error.message)
-      // Return mock data for demo purposes
-      return [
-        { id: '1', metric_name: 'total_users', value: 12430, created_at: new Date().toISOString() },
-        { id: '2', metric_name: 'completed_tasks', value: 89, created_at: new Date().toISOString() },
-        { id: '3', metric_name: 'total_tasks', value: 156, created_at: new Date().toISOString() }
-      ]
+      if (import.meta.env.DEV) {
+        console.warn('Analytics table not found, returning mock data:', error.message)
+        return [
+          { id: '1', metric_name: 'total_users', value: 12430, created_at: new Date().toISOString() },
+          { id: '2', metric_name: 'completed_tasks', value: 89, created_at: new Date().toISOString() },
+          { id: '3', metric_name: 'total_tasks', value: 156, created_at: new Date().toISOString() }
+        ]
+      }
+      throw error
     }
   }
 
@@ -74,27 +71,23 @@ class TenantApiService {
       if (!data) throw new Error('Failed to create analytics')
       return data
     } catch (error) {
-      console.warn('Failed to create analytics, table may not exist:', error.message)
-      // Return mock data for demo purposes
-      return {
-        id: Date.now().toString(),
-        ...analyticsData,
-        company_id: this.currentTenantId,
-        created_at: new Date().toISOString()
+      if (import.meta.env.DEV) {
+        console.warn('Failed to create analytics, table may not exist:', error.message)
+        return {
+          id: Date.now().toString(),
+          ...analyticsData,
+          company_id: this.currentTenantId,
+          created_at: new Date().toISOString()
+        }
       }
+      throw error
     }
   }
 
   // KPIs API methods
   async getKpis() {
     if (!this.currentTenantId) {
-      // Return mock data for demo purposes
-      return [
-        { id: '1', title: 'Total Revenue', value: 84250, change: 12.5, trend: 'up', created_at: new Date().toISOString() },
-        { id: '2', title: 'User Logins', value: 12430, change: 8.2, trend: 'up', created_at: new Date().toISOString() },
-        { id: '3', title: 'Conversion Rate', value: 3.6, change: -1.4, trend: 'down', created_at: new Date().toISOString() },
-        { id: '4', title: 'New Orders', value: 1893, change: 5.7, trend: 'up', created_at: new Date().toISOString() }
-      ]
+      throw new Error('Company ID not set. Please authenticate first.')
     }
 
     try {
@@ -106,14 +99,16 @@ class TenantApiService {
       if (error) throw error
       return data || []
     } catch (error) {
-      console.warn('KPIs table not found, returning mock data:', error.message)
-      // Return mock data for demo purposes
-      return [
-        { id: '1', title: 'Total Revenue', value: 84250, change: 12.5, trend: 'up', created_at: new Date().toISOString() },
-        { id: '2', title: 'User Logins', value: 12430, change: 8.2, trend: 'up', created_at: new Date().toISOString() },
-        { id: '3', title: 'Conversion Rate', value: 3.6, change: -1.4, trend: 'down', created_at: new Date().toISOString() },
-        { id: '4', title: 'New Orders', value: 1893, change: 5.7, trend: 'up', created_at: new Date().toISOString() }
-      ]
+      if (import.meta.env.DEV) {
+        console.warn('KPIs table not found, returning mock data:', error.message)
+        return [
+          { id: '1', title: 'Total Revenue', value: 84250, change: 12.5, trend: 'up', created_at: new Date().toISOString() },
+          { id: '2', title: 'User Logins', value: 12430, change: 8.2, trend: 'up', created_at: new Date().toISOString() },
+          { id: '3', title: 'Conversion Rate', value: 3.6, change: -1.4, trend: 'down', created_at: new Date().toISOString() },
+          { id: '4', title: 'New Orders', value: 1893, change: 5.7, trend: 'up', created_at: new Date().toISOString() }
+        ]
+      }
+      throw error
     }
   }
 

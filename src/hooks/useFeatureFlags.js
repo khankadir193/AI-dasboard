@@ -3,7 +3,7 @@ import { getFeatureFlags } from '../services/featureFlagService'
 
 export function useFeatureFlags(companyId, currentPlan) {
   const { data: flags = [], isLoading, error } = useQuery({
-    queryKey: ['featureFlags', companyId],
+    queryKey: ['featureFlags', companyId, currentPlan],
     queryFn: () => getFeatureFlags(companyId),
     enabled: !!companyId,
     staleTime: 1000 * 60 * 5,

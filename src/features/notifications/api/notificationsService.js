@@ -120,15 +120,17 @@ export async function fetchNotifications({ companyId, page = 1, pageSize = 20, t
   }
 }
 
-export async function markAsRead(notificationId) {
+export async function markAsRead(notificationId, companyId) {
   if (!notificationId) throw new Error('Notification ID is required')
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('notifications')
     .update({ is_read: true })
     .eq('id', notificationId)
-    .select()
-    .maybeSingle()
+
+  if (companyId) query = query.eq('company_id', companyId)
+
+  const { data, error } = await query.select().maybeSingle()
 
   if (error) {
     console.error('[notificationsService] markAsRead error:', error)

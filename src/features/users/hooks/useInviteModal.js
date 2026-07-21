@@ -80,7 +80,7 @@ export function useInviteModal({
       try {
         await sendInviteEmail(pendingRow.id)
       } catch (emailErr) {
-        await cancelInvite({ inviteId: pendingRow.id })
+        await cancelInvite({ inviteId: pendingRow.id, companyId })
         throw emailErr
       }
 
