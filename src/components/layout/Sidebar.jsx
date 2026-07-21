@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { useQueryClient } from '@tanstack/react-query'
+import { useUnreadCount } from '../../features/notifications/hooks/useNotifications'
 import {
   LayoutDashboard,
   BarChart3,
@@ -61,6 +62,7 @@ export default function Sidebar({ open, onClose }) {
   const companyId = profile?.company_id
   const { data: subscription } = useSubscription(companyId)
   const queryClient = useQueryClient()
+  const { data: unreadCount = 0 } = useUnreadCount()
 
   const isAuthenticated = Boolean(user && (profile || user.email))
   const displayName =
@@ -136,6 +138,11 @@ export default function Sidebar({ open, onClose }) {
               >
                 <Icon size={18} className="flex-none" />
                 <span className="truncate">{label}</span>
+                {to === '/notifications' && unreadCount > 0 && (
+                  <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>

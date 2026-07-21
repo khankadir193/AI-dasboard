@@ -38,7 +38,7 @@ function DashboardContent() {
     }
   })
 
-  const { data: analyticsData, isLoading, error, refetch } = useDashboardAnalytics(dateRange)
+  const { data: analyticsData, isLoading, error, refetch, dataUpdatedAt } = useDashboardAnalytics(dateRange)
   const { trialInfo = { isLoading: false, trialEnd: null, isExpired: false, daysLeft: 0 } } = useTrial()
   const queryClient = useQueryClient()
   const { pathname } = useLocation()
@@ -98,6 +98,10 @@ function DashboardContent() {
     <div className="space-y-6 stagger">
       {/* Date Range Filter */}
       <DateRangeFilter value={dateRange} onChange={setDateRange} />
+
+      {!isLoading && dataUpdatedAt && (
+        <p className="text-xs text-gray-400 text-right">Last updated: {new Date(dataUpdatedAt).toLocaleTimeString()}</p>
+      )}
 
       {!trialInfo.isLoading && trialInfo.trialEnd && (
         <div
