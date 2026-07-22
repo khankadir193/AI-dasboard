@@ -30,25 +30,8 @@ export async function generateReport({ companyId, type, title, userId }) {
       throw new Error(`Unknown report type: ${type}`)
   }
 
-  const reportType = type
-  const dateRange = content?.dateRange
-  console.log('[Report Builder] reportType:', reportType)
-  console.log('[Report Builder] dateRange:', dateRange)
-  console.log('[Report Builder] generated report.content:', JSON.stringify(content, null, 2))
-
-  if (!validateGeneratedContent(content)) {
-    console.warn('[reportsService] Generated content validation produced low text volume, proceeding with available data', { type })
-  }
-
-  console.log('[Supabase Insert] generated_reports payload:', JSON.stringify({
-    company_id: companyId,
-    report_type: type,
-    title: reportTitle,
-    contentPreview: content && typeof content === 'object' ? {
-      keys: Object.keys(content),
-      dateRange: content?.dateRange,
-    } : content,
-  }, null, 2))
+  // Validate generated content structure
+  validateGeneratedContent(content)
 
   const { data, error } = await supabase
     .from('generated_reports')
@@ -65,7 +48,6 @@ export async function generateReport({ companyId, type, title, userId }) {
   if (error) throw error
   if (!data) throw new Error('Failed to save report')
 
-  console.log('[Supabase Insert] inserted report.content:', JSON.stringify(data?.content, null, 2))
   return data
 }
 
