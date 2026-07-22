@@ -20,6 +20,9 @@ import FeatureGate from '../../components/auth/FeatureGate'
 
 // Module-level set persists across StrictMode unmount/remount to prevent duplicate tracking
 const trackedViewKeys = new Set()
+// Time-based guard: persists across StrictMode cycles to catch duplicate views with different locationKeys
+const lastViewTimestamps = new Map()
+const VIEW_DEDUP_WINDOW_MS = 5000
 
 function DashboardContent() {
   const navigate = useNavigate()
@@ -59,6 +62,12 @@ function DashboardContent() {
     const viewKey = `${profile.company_id}:${locationKey}`
     if (trackedViewKeys.has(viewKey)) return
     trackedViewKeys.add(viewKey)
+
+    // Time-based dedup: safety net for different locationKeys in the same redirect burst
+    const now = Date.now()
+    const lastTracked = lastViewTimestamps.get(profile.company_id)
+    if (lastTracked && (now - lastTracked) < VIEW_DEDUP_WINDOW_MS) return
+    lastViewTimestamps.set(profile.company_id, now)
 
     // Cap set size to prevent memory leak in long-lived SPAs
     if (trackedViewKeys.size > 100) {

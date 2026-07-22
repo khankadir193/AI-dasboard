@@ -17,6 +17,27 @@ const ALLOWED_TYPES = [
   'dashboard_view'
 ]
 
+// In-memory dedup to prevent duplicate event tracking within the redirect window
+const recentEvents = new Map()
+const DEDUP_WINDOW_MS = 2000
+let cleanupInterval = null
+
+function startCleanup() {
+  if (cleanupInterval) return
+  cleanupInterval = setInterval(() => {
+    const now = Date.now()
+    for (const [key, ts] of recentEvents) {
+      if (now - ts > DEDUP_WINDOW_MS * 2) {
+        recentEvents.delete(key)
+      }
+    }
+    if (recentEvents.size === 0 && cleanupInterval) {
+      clearInterval(cleanupInterval)
+      cleanupInterval = null
+    }
+  }, DEDUP_WINDOW_MS * 2)
+}
+
 /**
  * Track an analytics event (production-safe, non-blocking)
  * 
@@ -38,6 +59,14 @@ export async function trackEvent({ companyId, type, value = 1, metadata = {} }) 
   if (!ALLOWED_TYPES.includes(type)) {
     return
   }
+
+  // In-memory dedup: suppress rapid duplicates (same companyId + type within 2000ms)
+  const dedupKey = `${companyId}:${type}`
+  const now = Date.now()
+  const lastEvent = recentEvents.get(dedupKey)
+  if (lastEvent && (now - lastEvent) < DEDUP_WINDOW_MS) return
+  recentEvents.set(dedupKey, now)
+  startCleanup()
 
   // Non-blocking insert
   return supabase

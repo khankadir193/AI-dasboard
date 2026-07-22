@@ -348,88 +348,34 @@ export function exportReportToPDF(report, company) {
   }
 
   if (content.teamActivity && content.teamActivity.length > 0) {
-    checkSpace(content.teamActivity.length * 8 + 14)
+    checkSpace(content.teamActivity.length * 7 + 14)
     y = addSectionHeader(doc, margin, y, 'Team Activity', BLUE)
 
     const teamRows = content.teamActivity.map((member) => [
       sanitizeText(member.name || 'Unknown'),
-      String(member.totalActions || 0),
-      String(member.projectsCreated || 0),
-      String(member.logins || 0),
+      String(member.totalActions ?? 0),
+      String(member.projectsCreated ?? 0),
+      String(member.logins ?? 0),
     ])
 
     autoTable(doc, {
       startY: y,
-      head: [['Team Member', 'Actions', 'Projects Created', 'Logins']],
+      head: [['Name', 'Actions', 'Projects', 'Logins']],
       body: teamRows,
       theme: 'striped',
       headStyles: { fillColor: [...BLUE], fontSize: 9 },
       bodyStyles: { fontSize: 8 },
-      columnStyles: {
-        0: { cellWidth: contentWidth * 0.4 },
-        1: { cellWidth: contentWidth * 0.2, halign: 'center' },
-        2: { cellWidth: contentWidth * 0.2, halign: 'center' },
-        3: { cellWidth: contentWidth * 0.2, halign: 'center' },
-      },
       margin: { left: margin, right: margin },
     })
     y = doc.lastAutoTable.finalY + 10
   }
 
-  {
-    checkSpace(24)
-    doc.setDrawColor(200, 200, 200)
-    doc.line(margin, y, pageWidth - margin, y)
-    y += 6
-
-    if (isEffectivelyEmpty(content)) {
-      doc.setFontSize(10)
-      doc.setTextColor(140, 140, 140)
-      doc.text('No activity recorded in this period.', margin, y)
-      y += 6
-    } else {
-      const leftCol = [
-        `Projects: ${content.projectCount || 0}`,
-        `Active: ${content.activeProjects ?? 0}`,
-        `Completion Rate: ${content.completionRate ?? 0}%`,
-      ]
-      const rightCol = [
-        `Events Tracked: ${content.totalEvents || 0}`,
-        `Avg Daily: ${content.avgDailyEvents || 0}`,
-        `Activity Logs: ${content.activityCount || 0}`,
-      ]
-      const colWidth = contentWidth / 2
-
-      doc.setFontSize(8)
-      doc.setTextColor(100, 100, 100)
-      doc.setFont(undefined, 'normal')
-
-      leftCol.forEach((line, i) => {
-        doc.text(line, margin, y + i * 4)
-      })
-      rightCol.forEach((line, i) => {
-        doc.text(line, margin + colWidth, y + i * 4)
-      })
-      y += leftCol.length * 4 + 2
-    }
-    doc.setFontSize(7)
-    doc.setTextColor(120, 120, 120)
-    doc.text(`Generated: ${formatDate(content.generatedAt)}`, margin, y)
-  }
-
   addFooter()
-
   return doc
 }
 
 export function downloadPDF(doc, filename) {
-  const safeName = `${filename || 'report'}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
-  doc.save(safeName)
-}
-
-export function openPDFInNewTab(doc) {
-  const blob = doc.output('blob')
-  const url = URL.createObjectURL(blob)
-  window.open(url, '_blank')
-  setTimeout(() => URL.revokeObjectURL(url), 60000)
+  if (!doc) throw new Error('PDF document is required')
+  const name = filename || 'report'
+  doc.save(`${name}.pdf`)
 }

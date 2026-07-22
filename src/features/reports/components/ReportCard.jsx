@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Download, Trash2, ChevronDown, ChevronUp, FileText, BarChart3, Lightbulb, Target, Clock } from 'lucide-react'
-import { exportReportToPDF, downloadPDF } from '../../../services/pdfExportService'
+import { exportReportToPDF, downloadPDF } from '../services/pdfExportService'
 import { formatDate, getTypeLabel, getMetricLabel, TYPE_ICONS_MAP } from '../utils/reportHelpers'
 
 export default function ReportCard({ report, profile, onDelete, isDeleting }) {

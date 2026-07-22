@@ -1,10 +1,4 @@
-const LABEL_MAP = {
-  active_users: 'User Logins',
-  projects_created: 'Projects Created',
-  projects_updated: 'Projects Updated',
-  projects_deleted: 'Projects Deleted',
-  dashboard_view: 'Dashboard Views',
-}
+import { LABEL_MAP } from '../api/generators/reportGeneratorUtils'
 
 export function formatDate(dateStr) {
   if (!dateStr) return '—'

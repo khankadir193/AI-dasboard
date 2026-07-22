@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useSelector } from 'react-redux'
 import { AlertCircle } from 'lucide-react'
-import { useReports, useGenerateReport, useDeleteReport } from './hooks/useReports'
-import ReportCard from './components/ReportCard'
-import ReportGenerator from './components/ReportGenerator'
-import ReportsSkeleton from './components/ReportsSkeleton'
-import ReportsEmptyState from './components/ReportsEmptyState'
-import FeatureGate from '../../components/auth/FeatureGate'
-import { REPORT_TYPES } from './api/reportsService'
+import { useReports, useGenerateReport, useDeleteReport } from '../hooks/useReports'
+import ReportCard from '../components/ReportCard'
+import ReportGenerator from '../components/ReportGenerator'
+import ReportsSkeleton from '../components/ReportsSkeleton'
+import ReportsEmptyState from '../components/ReportsEmptyState'
+import FeatureGate from '../../../components/auth/FeatureGate'
+import { REPORT_TYPES } from '../api/reportsService'
 
 const TYPE_OPTIONS = [
   { value: '', label: 'All Reports' },

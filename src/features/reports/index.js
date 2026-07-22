@@ -1,4 +1,4 @@
-export { default as ReportsPage } from './ReportsPage'
+export { default as ReportsPage } from './pages/ReportsPage'
 export { default as ReportCard } from './components/ReportCard'
 export { default as ReportGenerator } from './components/ReportGenerator'
 export { default as ReportsSkeleton } from './components/ReportsSkeleton'
