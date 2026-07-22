@@ -2,17 +2,19 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Settings2 } from 'lucide-react'
 
 // Local imports
 import { useDashboardAnalytics } from './hooks/useDashboardAnalytics'
 import { useTrial } from './hooks/useTrial'
+import { useDashboardPreferences } from './hooks/useDashboardPreferences'
 import { useAnalyticsSubscription } from '../../hooks/useAnalyticsSubscription'
 import KPISection from './components/KPI/KPISection'
 import ActivityTimelineChart from './components/Charts/ActivityTimelineChart'
 import EventDistributionChart from './components/Charts/EventDistributionChart'
 import ProjectStatusChart from './components/Charts/ProjectStatusChart'
 import RecentActivityFeed from './components/ActivityFeed/RecentActivityFeed'
+import WidgetReorderPanel from './components/WidgetReorderPanel'
 import DateRangeFilter from '../../components/common/DateRangeFilter'
 import { trackEvent } from '../analytics/trackEvent'
 import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
@@ -46,6 +48,19 @@ function DashboardContent() {
   const queryClient = useQueryClient()
   const { pathname } = useLocation()
   const locationKey = useLocation().key
+
+  // Preferences fetched in parallel — never on the analytics critical path.
+  // Existing users with no row in dashboard_preferences get DEFAULT_WIDGET_ORDER
+  // and see zero visual change from before this feature was added.
+  const {
+    widgetOrder,
+    hiddenWidgets,
+    isSaving,
+    updatePreferences,
+    resetPreferences,
+  } = useDashboardPreferences()
+
+  const [showCustomizePanel, setShowCustomizePanel] = useState(false)
 
   useAnalyticsSubscription(profile?.company_id)
 
@@ -103,14 +118,110 @@ function DashboardContent() {
     )
   }
 
+  // ── Helper: determine chart row visibility ────────────────────────────────
+  // ActivityTimelineChart and ProjectStatusChart share a grid wrapper in the
+  // original Dashboard.jsx. To support individual show/hide while preserving
+  // the side-by-side layout, the wrapper is now conditional.
+  const showTimeline = !hiddenWidgets.includes('activity_timeline')
+  const showProjectStatus = !hiddenWidgets.includes('project_status')
+
+  /**
+   * Renders a single widget slot by ID.
+   * 'charts_row' is a compound slot containing both chart widgets.
+   */
+  function renderSlot(slotId) {
+    switch (slotId) {
+      case 'kpi_section':
+        if (hiddenWidgets.includes('kpi_section')) return null
+        return (
+          <KPISection
+            key="kpi_section"
+            kpiData={analyticsData?.kpiData}
+            growthData={analyticsData?.growthData}
+            dateLabel={dateRange.label}
+            loading={isLoading}
+            error={error}
+            onRetry={refetch}
+          />
+        )
+
+      case 'charts_row':
+        if (!showTimeline && !showProjectStatus) return null
+        return (
+          // Grid wrapper preserved when both charts are visible (no visual regression).
+          // When only one chart is visible, it renders full-width (no orphaned grid cell).
+          <div
+            key="charts_row"
+            className={showTimeline && showProjectStatus
+              ? 'grid grid-cols-1 xl:grid-cols-3 gap-6'
+              : ''}
+          >
+            {showTimeline && (
+              <ActivityTimelineChart
+                data={analyticsData?.activityTimelineData}
+                loading={isLoading}
+                error={error}
+              />
+            )}
+            {showProjectStatus && (
+              <ProjectStatusChart
+                data={analyticsData?.projectStatusData}
+                loading={isLoading}
+                error={error}
+              />
+            )}
+          </div>
+        )
+
+      case 'event_distribution':
+        if (hiddenWidgets.includes('event_distribution')) return null
+        return (
+          <EventDistributionChart
+            key="event_distribution"
+            kpiData={analyticsData?.kpiData}
+            loading={isLoading}
+            error={error}
+          />
+        )
+
+      case 'recent_activity_feed':
+        if (hiddenWidgets.includes('recent_activity_feed')) return null
+        return (
+          <RecentActivityFeed
+            key="recent_activity_feed"
+            activities={analyticsData?.recentActivity}
+            loading={isLoading}
+            error={error}
+          />
+        )
+
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="space-y-6 stagger">
       {/* Date Range Filter */}
       <DateRangeFilter value={dateRange} onChange={setDateRange} />
 
-      {!isLoading && dataUpdatedAt && (
-        <p className="text-xs text-gray-400 text-right">Last updated: {new Date(dataUpdatedAt).toLocaleTimeString()}</p>
-      )}
+      {/* Header row: last-updated timestamp + customize button */}
+      <div className="flex items-center justify-between">
+        {!isLoading && dataUpdatedAt ? (
+          <p className="text-xs text-gray-400">
+            Last updated: {new Date(dataUpdatedAt).toLocaleTimeString()}
+          </p>
+        ) : <span />}
+        <button
+          id="dashboard-customize-btn"
+          onClick={() => setShowCustomizePanel(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          aria-label="Customize dashboard layout"
+        >
+          <Settings2 size={13} />
+          Customize
+        </button>
+      </div>
 
       {!trialInfo.isLoading && trialInfo.trialEnd && (
         <div
@@ -135,36 +246,26 @@ function DashboardContent() {
         </div>
       )}
 
-      {/* KPI Section */}
-      <KPISection kpiData={analyticsData?.kpiData} growthData={analyticsData?.growthData} dateLabel={dateRange.label} loading={isLoading} error={error} onRetry={refetch} />
+      {/* Widget slots rendered in user's preferred order */}
+      {widgetOrder.map((slotId) => renderSlot(slotId))}
 
-      {/* Charts row */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <ActivityTimelineChart
-          data={analyticsData?.activityTimelineData}
-          loading={isLoading}
-          error={error}
+      {/* Customize panel (slide-in overlay) */}
+      {showCustomizePanel && (
+        <WidgetReorderPanel
+          widgetOrder={widgetOrder}
+          hiddenWidgets={hiddenWidgets}
+          isSaving={isSaving}
+          onUpdate={(newOrder, newHidden) => {
+            updatePreferences(newOrder, newHidden)
+            setShowCustomizePanel(false)
+          }}
+          onReset={() => {
+            resetPreferences()
+            setShowCustomizePanel(false)
+          }}
+          onClose={() => setShowCustomizePanel(false)}
         />
-        <ProjectStatusChart
-          data={analyticsData?.projectStatusData}
-          loading={isLoading}
-          error={error}
-        />
-      </div>
-
-      {/* Event Distribution Chart */}
-      <EventDistributionChart
-        kpiData={analyticsData?.kpiData}
-        loading={isLoading}
-        error={error}
-      />
-
-      {/* Recent Activity */}
-      <RecentActivityFeed
-        activities={analyticsData?.recentActivity}
-        loading={isLoading}
-        error={error}
-      />
+      )}
     </div>
   )
 }
@@ -176,4 +277,3 @@ export default function Dashboard() {
     </FeatureGate>
   )
 }
-

@@ -21,6 +21,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   FileText,
+  Users2,
 } from 'lucide-react'
 
 import clsx from 'clsx'
@@ -34,6 +35,7 @@ const navItems = [
   { to: '/data-table', icon: Table2, label: 'Team Management' },
   { to: '/activity-logs', icon: History, label: 'Activity Logs' },
   { to: '/reports', icon: FileText, label: 'Reports' },
+  { to: '/team-performance', icon: Users2, label: 'Team Performance' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/audit-logs', icon: ScrollText, label: 'Audit Trail' },
 ]

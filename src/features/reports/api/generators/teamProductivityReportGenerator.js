@@ -1,70 +1,12 @@
-import { supabase } from '../../../../lib/supabaseClient'
 import { analyticsService } from '../../../../services/analyticsService'
 import { getProjects } from '../../../../lib/projectsApi'
 import { fetchActivityLogs } from '../../../../services/activityLogService'
 import { getDateRangeForType, buildTeamSummary, getTypeSummary, REPORT_TYPES } from './reportGeneratorUtils'
 import { generateAIReportContent } from './aiContentGenerator'
+// computeTeamActivity extracted to shared service (features/team-performance) to avoid
+// duplication between the Reports generator and the Team Performance page.
+import { computeTeamActivity } from '../../../../features/team-performance/services/teamPerformanceService'
 
-async function computeTeamActivity(logs) {
-  if (!logs || logs.length === 0) return []
-
-  const userMap = new Map()
-
-  logs.forEach((log) => {
-    const uid = log.user_id
-    if (!uid) return
-
-    if (!userMap.has(uid)) {
-      userMap.set(uid, {
-        userId: uid,
-        totalActions: 0,
-        projectsCreated: 0,
-        projectsUpdated: 0,
-        logins: 0,
-      })
-    }
-
-    const entry = userMap.get(uid)
-    entry.totalActions++
-
-    if (log.action === 'project_create' || log.action === 'projects_created' || log.action === 'project_created') {
-      entry.projectsCreated++
-    }
-
-    if (log.action === 'project_update' || log.action === 'project_updated' || log.action === 'projects_updated') {
-      entry.projectsUpdated++
-    }
-
-    if (log.action === 'login' || log.action === 'logins' || log.action === 'user_login') {
-      entry.logins++
-    }
-  })
-
-  const userIds = Array.from(userMap.keys())
-  let profiles = []
-  try {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .in('id', userIds)
-    profiles = data || []
-  } catch { }
-
-  const profileMap = {}
-  profiles.forEach((p) => { profileMap[p.id] = p.full_name || p.email || 'Unknown' })
-
-  return Array.from(userMap.values())
-    .sort((a, b) => b.totalActions - a.totalActions)
-    .map((entry, index) => ({
-      rank: index + 1,
-      name: profileMap[entry.userId] || 'Team Member',
-      totalActions: entry.totalActions,
-      projectsCreated: entry.projectsCreated,
-      projectsUpdated: entry.projectsUpdated,
-      logins: entry.logins,
-      contributions: entry.totalActions,
-    }))
-}
 
 async function generateTeamProductivityReport({ companyId }) {
   const dateRange = await getDateRangeForType(REPORT_TYPES.TEAM_PRODUCTIVITY)

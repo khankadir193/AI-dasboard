@@ -18,6 +18,7 @@ import PrivateRoute from '../routes/PrivateRoute'
 import PublicOnlyRoute from '../routes/PublicOnlyRoute'
 import RootRedirect from '../routes/RootRedirect'
 import AcceptInvitePage from '../features/invitations/pages/AcceptInvitePage.jsx'
+import TeamPerformancePage from '../features/team-performance/pages/TeamPerformancePage.jsx'
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/audit-logs" element={<AuditLogs />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/billing" element={<Billing />} />
+          <Route path="/team-performance" element={<TeamPerformancePage />} />
         </Route>
         <Route path="/invite/:token" element={<AcceptInvitePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
