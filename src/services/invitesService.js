@@ -73,10 +73,10 @@ const toPendingRowShape = (invite) => {
     statusClass: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200',
     joinedAt: createdAt
       ? new Date(createdAt).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        })
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      })
       : 'N/A',
     avatarGradient: 'from-amber-400 to-amber-600',
     isActive: false

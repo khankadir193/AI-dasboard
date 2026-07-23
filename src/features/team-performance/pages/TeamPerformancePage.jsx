@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSelector } from 'react-redux'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Users, Zap, TrendingUp, BarChart2 } from 'lucide-react'
 import FeatureGate from '../../../components/auth/FeatureGate'
 import DateRangeFilter from '../../../components/common/DateRangeFilter'
 import { useTeamPerformance } from '../hooks/useTeamPerformance'
@@ -13,6 +13,29 @@ import CompletionEfficiencyChart from '../components/CompletionEfficiencyChart'
 import WeeklyTrendsChart from '../components/WeeklyTrendsChart'
 import ActivityHeatmap from '../components/ActivityHeatmap'
 
+// ─── Small stat pill used in the summary strip ────────────────────────────────
+function SummaryPill({ icon: Icon, label, value, loading }) {
+  return (
+    <div className="card flex items-center gap-3 px-4 py-3 min-w-0">
+      <span className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-950 flex-none">
+        <Icon size={14} className="text-blue-600 dark:text-blue-400" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 uppercase tracking-wide font-medium truncate">
+          {label}
+        </p>
+        {loading ? (
+          <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mt-0.5" />
+        ) : (
+          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+            {value ?? '—'}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /**
  * TeamPerformanceContent — the inner page component.
  *
@@ -22,7 +45,7 @@ import ActivityHeatmap from '../components/ActivityHeatmap'
  *
  * Data fetching:
  *   - useTeamPerformance scopes all data to profile.company_id via the service layer.
- *   - useActivityHeatmap is independent (separate cache key, separate staleTime).
+ *   - useActivityHeatmap receives the SAME dateRange so filter changes refetch both.
  *   - Each section handles its own loading/error/empty state independently.
  */
 function TeamPerformanceContent() {
@@ -50,12 +73,13 @@ function TeamPerformanceContent() {
     refetch,
   } = useTeamPerformance(dateRange)
 
+  // Bug #2 fix: pass dateRange so heatmap respects the selected filter
   const {
     data: heatmapData,
     isLoading: heatmapLoading,
     error: heatmapError,
     refetch: refetchHeatmap,
-  } = useActivityHeatmap()
+  } = useActivityHeatmap(dateRange)
 
   // Auth guard
   if (!isAuthLoading && !user) {
@@ -93,12 +117,19 @@ function TeamPerformanceContent() {
       {/* Date range filter — reuses existing shared component */}
       <DateRangeFilter value={dateRange} onChange={setDateRange} />
 
-      {/* ── Activity Heatmap (90-day, independent of date filter) ── */}
+      {/* ── Summary Strip (new additive row — 4 derived metrics) ────────────── */}
+      <TeamEfficiencySummary
+        performanceData={performanceData}
+        isLoading={isLoading}
+      />
+
+      {/* ── Activity Heatmap (respects date filter via dateRange prop) ── */}
       <ActivityHeatmap
         data={heatmapData}
         loading={heatmapLoading}
         error={heatmapError}
         onRetry={refetchHeatmap}
+        dateRange={dateRange}
       />
 
       {/* ── Top Contributors ── */}
@@ -136,6 +167,76 @@ function TeamPerformanceContent() {
   )
 }
 
+// ─── Summary Strip ────────────────────────────────────────────────────────────
+// All 4 metrics are pure useMemo derivations from the already-cached
+// performanceData — zero additional network calls.
+function TeamEfficiencySummary({ performanceData, isLoading }) {
+  const topContributors = performanceData?.topContributors ?? []
+  const weeklyTrends = performanceData?.weeklyTrends ?? []
+
+  const summary = useMemo(() => {
+    // Top Contributor
+    const topContributor = topContributors[0]?.name ?? null
+
+    // Average actions per active user
+    const totalActions = topContributors.reduce((s, c) => s + c.totalActions, 0)
+    const memberCount = topContributors.length
+    const avgActionsPerUser =
+      memberCount > 0 ? Math.round((totalActions / memberCount) * 10) / 10 : null
+
+    // Weekly Growth % — last 2 completed weeks from weeklyTrends
+    let weeklyGrowth = null
+    if (weeklyTrends.length >= 2) {
+      const lastWeek = weeklyTrends[weeklyTrends.length - 1]?.count ?? 0
+      const prevWeek = weeklyTrends[weeklyTrends.length - 2]?.count ?? 0
+      if (prevWeek > 0) {
+        weeklyGrowth = Math.round(((lastWeek - prevWeek) / prevWeek) * 100)
+      } else if (lastWeek > 0) {
+        weeklyGrowth = 100 // prev was 0, this week had activity → +100%
+      }
+    }
+
+    // Active team members (any user with ≥1 action in range)
+    const activeMembers = memberCount
+
+    return { topContributor, avgActionsPerUser, weeklyGrowth, activeMembers }
+  }, [topContributors, weeklyTrends])
+
+  const growthStr =
+    summary.weeklyGrowth === null
+      ? '—'
+      : `${summary.weeklyGrowth >= 0 ? '+' : ''}${summary.weeklyGrowth}%`
+
+  return (
+    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+      <SummaryPill
+        icon={Users}
+        label="Top Contributor"
+        value={summary.topContributor}
+        loading={isLoading}
+      />
+      <SummaryPill
+        icon={BarChart2}
+        label="Avg Actions / User"
+        value={summary.avgActionsPerUser !== null ? String(summary.avgActionsPerUser) : '—'}
+        loading={isLoading}
+      />
+      <SummaryPill
+        icon={TrendingUp}
+        label="Weekly Growth"
+        value={growthStr}
+        loading={isLoading}
+      />
+      <SummaryPill
+        icon={Zap}
+        label="Active Members"
+        value={summary.activeMembers > 0 ? String(summary.activeMembers) : '—'}
+        loading={isLoading}
+      />
+    </div>
+  )
+}
+
 /**
  * TeamPerformancePage — public export.
  *
@@ -150,3 +251,4 @@ export default function TeamPerformancePage() {
     </FeatureGate>
   )
 }
+

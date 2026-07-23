@@ -31,11 +31,16 @@ export async function computeTeamActivity(logs) {
         projectsCreated: 0,
         projectsUpdated: 0,
         logins: 0,
+        activeDays: new Set(), // unique calendar days this user had activity
       })
     }
 
     const entry = userMap.get(uid)
     entry.totalActions++
+
+    // Track unique active days for actionsPerDay derivation
+    const dateStr = log.created_at?.split('T')[0]
+    if (dateStr) entry.activeDays.add(dateStr)
 
     if (
       log.action === 'project_create' ||
@@ -89,6 +94,7 @@ export async function computeTeamActivity(logs) {
       projectsCreated: entry.projectsCreated,
       projectsUpdated: entry.projectsUpdated,
       logins: entry.logins,
+      activeDays: entry.activeDays.size,
       contributions: entry.totalActions, // alias kept for report compatibility
     }))
 }
@@ -190,12 +196,29 @@ export async function fetchTeamPerformanceData({ companyId, startDate, endDate }
   const companyActiveRatio =
     totalProjects > 0 ? Math.round((activeProjects / totalProjects) * 100) : 0
 
-  const completionEfficiency = topContributors.slice(0, 8).map((c) => ({
-    name: c.name,
-    projectsCreated: c.projectsCreated,
-    projectsUpdated: c.projectsUpdated,
-    activeRatio: companyActiveRatio,
-  }))
+  const completionEfficiency = topContributors.slice(0, 8).map((c) => {
+    const activeDays = c.activeDays || 0
+    const actionsPerDay =
+      activeDays > 0 ? Math.round((c.totalActions / activeDays) * 10) / 10 : 0
+    const totalProjectActions = c.projectsCreated + c.projectsUpdated
+    const createdUpdatedRatio =
+      c.projectsUpdated > 0
+        ? Math.round((c.projectsCreated / c.projectsUpdated) * 10) / 10
+        : c.projectsCreated > 0
+          ? null // updated=0, can't form a ratio — treat as "all created"
+          : 0
+    return {
+      name: c.name,
+      totalActions: c.totalActions,        // ← Bug #1 fix: field was missing
+      projectsCreated: c.projectsCreated,
+      projectsUpdated: c.projectsUpdated,
+      activeRatio: companyActiveRatio,
+      activeDays,
+      actionsPerDay,
+      createdUpdatedRatio,
+      totalProjectActions,
+    }
+  })
 
   // Weekly trends derived from the same logs batch (no additional query)
   const weeklyTrends = buildWeeklyTrends(logs, 12)

@@ -63,7 +63,7 @@ function HeatmapSkeleton() {
  *   error    — Error | null
  *   onRetry  — () => void
  */
-const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetry }) => {
+const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetry, dateRange }) => {
   if (loading) return <HeatmapSkeleton />
 
   if (error) {
@@ -87,12 +87,14 @@ const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetr
 
   const isEmpty = !data || data.length === 0 || data.every((d) => d.count === 0)
 
+  const rangeLabel = dateRange?.label ?? 'selected range'
+
   if (isEmpty) {
     return (
       <div className="card p-8 flex justify-center">
         <EmptyState
           icon={Activity}
-          title="No activity in the last 90 days"
+          title={`No activity in ${rangeLabel.toLowerCase()}`}
           description="Actions logged by your team will appear here as a contribution heatmap."
         />
       </div>
@@ -158,7 +160,7 @@ const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetr
         <div>
           <h3 className="font-semibold text-gray-900 dark:text-white">Activity Heatmap</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {totalActions.toLocaleString()} action{totalActions !== 1 ? 's' : ''} in the last 90 days
+            {totalActions.toLocaleString()} action{totalActions !== 1 ? 's' : ''} in {(dateRange?.label ?? '90 Days').toLowerCase()}
           </p>
         </div>
         {/* Legend */}

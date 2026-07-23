@@ -1,7 +1,8 @@
 import { fetchActivityLogs } from '../../../services/activityLogService'
 
 /**
- * Fetches 90 days of activity_logs for the given company and groups by calendar day.
+ * Fetches activity_logs for the given company and date range, then groups
+ * results by calendar day for a contribution heatmap.
  *
  * Why activity_logs (not analytics_data)?
  *   analytics_data stores pre-aggregated daily metrics keyed by metric_type
@@ -9,24 +10,19 @@ import { fetchActivityLogs } from '../../../services/activityLogService'
  *   counts for a contribution heatmap. activity_logs has one row per action, so
  *   grouping by date gives an accurate daily contribution count.
  *
- * Query is bounded at pageSize: 2000. Companies with >2000 actions in 90 days
- * will have their heatmap truncated at the most-recent 2000 events (which still
- * gives a meaningful distribution across the 90-day window).
+ * Query is bounded at pageSize: 2000. Companies with >2000 actions in the
+ * requested window will have their heatmap truncated at the most-recent 2000
+ * events (which still gives a meaningful distribution).
  *
- * Returns a contiguous 90-element array so the CSS-grid heatmap has no gaps.
+ * Returns a contiguous array (one element per day in [startDate, endDate])
+ * so the CSS-grid heatmap has no gaps. For a single-day "Today" range this
+ * returns a 1-element array — the grid renders a single column correctly.
  *
- * @param {{ companyId: string }} params
+ * @param {{ companyId: string, startDate: string, endDate: string }} params
  * @returns {Promise<Array<{ date: string, count: number, dayOfWeek: number }>>}
  */
-export async function fetchHeatmapData({ companyId }) {
-  if (!companyId) return []
-
-  const end = new Date()
-  const start = new Date()
-  start.setDate(start.getDate() - 89) // inclusive: 90 days
-
-  const startDate = start.toISOString().split('T')[0]
-  const endDate = end.toISOString().split('T')[0]
+export async function fetchHeatmapData({ companyId, startDate, endDate }) {
+  if (!companyId || !startDate || !endDate) return []
 
   const result = await fetchActivityLogs({
     companyId,
@@ -46,20 +42,22 @@ export async function fetchHeatmapData({ companyId }) {
 
   // Fill every day in the window (zero-count days included for grid completeness)
   const days = []
-  const cursor = new Date(start)
-  cursor.setHours(0, 0, 0, 0)
-  const endDay = new Date(end)
-  endDay.setHours(23, 59, 59, 999)
+  // Parse dates as UTC midnight to avoid DST-induced off-by-one shifts
+  const [sy, sm, sd] = startDate.split('-').map(Number)
+  const [ey, em, ed] = endDate.split('-').map(Number)
+  const cursor = new Date(Date.UTC(sy, sm - 1, sd))
+  const endDay = new Date(Date.UTC(ey, em - 1, ed))
 
   while (cursor <= endDay) {
     const dateStr = cursor.toISOString().split('T')[0]
     days.push({
       date: dateStr,
       count: countMap.get(dateStr) || 0,
-      dayOfWeek: cursor.getDay(), // 0 = Sun, 6 = Sat
+      dayOfWeek: cursor.getUTCDay(), // 0 = Sun, 6 = Sat
     })
-    cursor.setDate(cursor.getDate() + 1)
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
   }
 
   return days
 }
+
