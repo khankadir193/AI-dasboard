@@ -38,26 +38,12 @@ function SummaryPill({ icon: Icon, label, value, loading }) {
   )
 }
 
-/**
- * TeamPerformanceContent — the inner page component.
- *
- * RBAC: checks ANALYTICS_VIEW permission (already granted to all 4 existing roles —
- * no new permission key was added). If insufficient, renders an access-denied message
- * rather than redirecting (consistent with how other analytics pages handle this).
- *
- * Data fetching:
- *   - useTeamPerformance scopes all data to profile.company_id via the service layer.
- *   - The result now includes `heatmapDays` derived from the same logs batch —
- *     no second Supabase request for ActivityHeatmap.
- *   - Changing the DateRangeFilter updates ALL widgets simultaneously via one
- *     shared dateRange state. No widget has an independent filter.
- */
+/** The inner page component. */
 function TeamPerformanceContent() {
   const navigate = useNavigate()
   const { user, loading: isAuthLoading } = useSelector((state) => state.auth)
   const { profile } = useSelector((state) => state.profile)
 
-  // Single shared filter state — all widgets update together when this changes.
   const [dateRange, setDateRange] = useState(() => {
     const end = new Date()
     const start = new Date()
@@ -70,8 +56,6 @@ function TeamPerformanceContent() {
     }
   })
 
-  // Single query — returns all analytics data including heatmapDays.
-  // No separate useActivityHeatmap call needed.
   const {
     data: performanceData,
     isLoading,
@@ -85,7 +69,6 @@ function TeamPerformanceContent() {
     return null
   }
 
-  // RBAC guard — reuses existing ANALYTICS_VIEW permission, no new key invented
   if (profile && !hasPermission(profile.role, PERMISSIONS.ANALYTICS_VIEW)) {
     return (
       <div className="card p-8 text-center max-w-md mx-auto">
@@ -102,7 +85,6 @@ function TeamPerformanceContent() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
       <div>
         <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
           Team Performance
@@ -112,16 +94,13 @@ function TeamPerformanceContent() {
         </p>
       </div>
 
-      {/* Date range filter — single shared state; all widgets update together */}
       <DateRangeFilter value={dateRange} onChange={setDateRange} />
 
-      {/* ── Analytics Cards — 10 metrics, all derived from activity_logs ── */}
       <TeamEfficiencySummary
         performanceData={performanceData}
         isLoading={isLoading}
       />
 
-      {/* ── Activity Heatmap — heatmapDays from same query (no second fetch) ── */}
       <ActivityHeatmap
         data={performanceData?.heatmapDays}
         loading={isLoading}
@@ -130,7 +109,6 @@ function TeamPerformanceContent() {
         dateRange={dateRange}
       />
 
-      {/* ── Top Contributors ── */}
       <TopContributorsTable
         data={performanceData?.topContributors}
         loading={isLoading}
@@ -138,7 +116,6 @@ function TeamPerformanceContent() {
         onRetry={refetch}
       />
 
-      {/* ── Projects Per User + Completion Efficiency (2-col on xl) ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <ProjectsPerUserChart
           data={performanceData?.completionEfficiency}
@@ -154,7 +131,6 @@ function TeamPerformanceContent() {
         />
       </div>
 
-      {/* ── Activity Trends — adapts grouping to selected date range ── */}
       <WeeklyTrendsChart
         data={performanceData?.weeklyTrends}
         loading={isLoading}
@@ -166,12 +142,6 @@ function TeamPerformanceContent() {
   )
 }
 
-// ─── Analytics Summary Strip ──────────────────────────────────────────────────
-// 10 metrics (2 rows of 5), all derived from activity_logs via computeAnalyticsCards.
-// Zero additional network calls beyond the main data fetch.
-//
-// Row 1: Top Contributor · Avg Actions/User · Weekly Growth · Active Members · Total Actions
-// Row 2: Avg Daily Actions · Team Efficiency · Most Active Day · Most Active Week · Peak Date
 function TeamEfficiencySummary({ performanceData, isLoading }) {
   const cards = performanceData?.analyticsCards ?? null
 
@@ -197,7 +167,6 @@ function TeamEfficiencySummary({ performanceData, isLoading }) {
 
   return (
     <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
-      {/* Row 1 */}
       <SummaryPill
         icon={Users}
         label="Top Contributor"
@@ -233,7 +202,6 @@ function TeamEfficiencySummary({ performanceData, isLoading }) {
         loading={isLoading}
       />
 
-      {/* Row 2 */}
       <SummaryPill
         icon={BarChart}
         label="Avg Daily Actions"
@@ -268,13 +236,6 @@ function TeamEfficiencySummary({ performanceData, isLoading }) {
   )
 }
 
-/**
- * TeamPerformancePage — public export.
- *
- * Wrapped in FeatureGate with feature="team_performance".
- * "team_performance" is NOT in GATED_FEATURES (same rationale as /analytics —
- * this is a core analytics page, not a premium feature gate).
- */
 export default function TeamPerformancePage() {
   return (
     <FeatureGate feature="team_performance">

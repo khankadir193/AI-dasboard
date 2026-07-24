@@ -19,9 +19,7 @@ import DateRangeFilter from '../../components/common/DateRangeFilter'
 import { trackEvent } from '../analytics/trackEvent'
 import FeatureGate from '../../components/auth/FeatureGate'
 
-// Module-level set persists across StrictMode unmount/remount to prevent duplicate tracking
 const trackedViewKeys = new Set()
-// Time-based guard: persists across StrictMode cycles to catch duplicate views with different locationKeys
 const lastViewTimestamps = new Map()
 const VIEW_DEDUP_WINDOW_MS = 5000
 
@@ -48,9 +46,6 @@ function DashboardContent() {
   const { pathname } = useLocation()
   const locationKey = useLocation().key
 
-  // Preferences fetched in parallel — never on the analytics critical path.
-  // Existing users with no row in dashboard_preferences get DEFAULT_WIDGET_ORDER
-  // and see zero visual change from before this feature was added.
   const {
     widgetOrder,
     hiddenWidgets,
@@ -69,7 +64,6 @@ function DashboardContent() {
     }
   }, [isAuthLoading, user, navigate])
 
-  // Track dashboard view on every route entry (StrictMode-safe via module-level set keyed by location key)
   useEffect(() => {
     if (!profile?.company_id) return
 
@@ -77,19 +71,15 @@ function DashboardContent() {
     if (trackedViewKeys.has(viewKey)) return
     trackedViewKeys.add(viewKey)
 
-    // Time-based dedup: safety net for different locationKeys in the same redirect burst
     const now = Date.now()
     const lastTracked = lastViewTimestamps.get(profile.company_id)
     if (lastTracked && (now - lastTracked) < VIEW_DEDUP_WINDOW_MS) return
     lastViewTimestamps.set(profile.company_id, now)
 
-    // Cap set size to prevent memory leak in long-lived SPAs
     if (trackedViewKeys.size > 100) {
       trackedViewKeys.clear()
     }
 
-    // Write to analytics_data only (powers Analytics page KPI counters).
-    // Dashboard views are NOT logged to activity_logs per product spec.
     trackEvent({
       companyId: profile.company_id,
       type: 'dashboard_view',
@@ -111,17 +101,9 @@ function DashboardContent() {
     )
   }
 
-  // ── Helper: determine chart row visibility ────────────────────────────────
-  // ActivityTimelineChart and ProjectStatusChart share a grid wrapper in the
-  // original Dashboard.jsx. To support individual show/hide while preserving
-  // the side-by-side layout, the wrapper is now conditional.
   const showTimeline = !hiddenWidgets.includes('activity_timeline')
   const showProjectStatus = !hiddenWidgets.includes('project_status')
 
-  /**
-   * Renders a single widget slot by ID.
-   * 'charts_row' is a compound slot containing both chart widgets.
-   */
   function renderSlot(slotId) {
     switch (slotId) {
       case 'kpi_section':
@@ -141,8 +123,6 @@ function DashboardContent() {
       case 'charts_row':
         if (!showTimeline && !showProjectStatus) return null
         return (
-          // Grid wrapper preserved when both charts are visible (no visual regression).
-          // When only one chart is visible, it renders full-width (no orphaned grid cell).
           <div
             key="charts_row"
             className={showTimeline && showProjectStatus
@@ -195,10 +175,8 @@ function DashboardContent() {
 
   return (
     <div className="space-y-6 stagger">
-      {/* Date Range Filter */}
       <DateRangeFilter value={dateRange} onChange={setDateRange} />
 
-      {/* Header row: last-updated timestamp + customize button */}
       <div className="flex items-center justify-between">
         {!isLoading && dataUpdatedAt ? (
           <p className="text-xs text-gray-400">
@@ -239,10 +217,8 @@ function DashboardContent() {
         </div>
       )}
 
-      {/* Widget slots rendered in user's preferred order */}
       {widgetOrder.map((slotId) => renderSlot(slotId))}
 
-      {/* Customize panel (slide-in overlay) */}
       {showCustomizePanel && (
         <WidgetReorderPanel
           widgetOrder={widgetOrder}

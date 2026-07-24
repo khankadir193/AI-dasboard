@@ -2,9 +2,6 @@ import { memo, useMemo } from 'react'
 import { Activity, RotateCcw } from 'lucide-react'
 import EmptyState from '../../../components/common/EmptyState'
 
-// ─── Colour scale ─────────────────────────────────────────────────────────────
-// Absolute thresholds per the spec (0/1-2/3-5/6+).
-// Both light-mode and dark-mode Tailwind classes provided.
 const COLOR_LEVELS = [
   { max: 0,        bg: 'bg-gray-100 dark:bg-gray-800',   label: 'No activity' },
   { max: 2,        bg: 'bg-green-100 dark:bg-green-900', label: '1–2 actions' },
@@ -19,7 +16,6 @@ function getCellColor(count) {
   return COLOR_LEVELS[COLOR_LEVELS.length - 1].bg
 }
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
 function HeatmapSkeleton() {
   return (
     <div className="card animate-pulse">
@@ -32,45 +28,28 @@ function HeatmapSkeleton() {
   )
 }
 
-// ─── Detect display mode from range ──────────────────────────────────────────
 function getDisplayMode(data, dateRange) {
   const preset = dateRange?.preset
-  // Preset-based detection
+
   if (preset === 'today' || preset === '1') return 'hourly'
   if (preset === '7') return 'daily'
   if (preset === '30') return 'monthly'
 
-  // Fallback: infer from data length
   const days = data?.length ?? 0
   if (days <= 1) return 'hourly'
   if (days <= 7) return 'daily'
   if (days <= 35) return 'monthly'
-  return 'github' // 90-day GitHub-style contribution grid
+  return 'github'
 }
 
-// ─── Sub-renderers by mode ────────────────────────────────────────────────────
-
-/**
- * Hourly view (Today / 1-day range).
- * 24 horizontal blocks, one per hour.
- * Data prop is expected to be the heatmapDays array for a single day
- * (1 element). We treat the existing day-level data as a best-effort render
- * since activity_logs records are grouped by day, not hour, in the current
- * service — the single block shows total activity for that day.
- *
- * If hourly data is eventually needed, the service can be extended
- * independently without changing this component interface.
- */
+/** Hourly view (Today / 1-day range). */
 function HourlyView({ data, maxCount }) {
-  // For now we render a single-day summary as a full-width colored bar
   const totalCount = data.reduce((s, d) => s + d.count, 0)
   const bg = getCellColor(totalCount)
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 flex-wrap">
         {Array.from({ length: 24 }, (_, h) => {
-          // Distribute total count roughly across hours — service currently
-          // doesn't store per-hour breakdowns, so we render uniform intensity.
           const bg = getCellColor(totalCount > 0 ? Math.max(1, Math.round(totalCount / 24)) : 0)
           return (
             <div
@@ -94,10 +73,7 @@ function HourlyView({ data, maxCount }) {
   )
 }
 
-/**
- * Daily view (Last 7 days).
- * 7 vertical bars labelled by day name.
- */
+/** Daily view (Last 7 days). */
 function DailyView({ data }) {
   const maxCount = Math.max(...data.map((d) => d.count), 1)
   return (
@@ -137,10 +113,7 @@ function DailyView({ data }) {
   )
 }
 
-/**
- * Monthly calendar view (Last 30 days).
- * Calendar-style grid: rows = weeks, columns = days of week (Mon–Sun).
- */
+/** Monthly calendar view (Last 30 days). */
 function MonthlyView({ data }) {
   const { weeks, maxCount } = useMemo(() => {
     let mx = 0
@@ -159,7 +132,6 @@ function MonthlyView({ data }) {
   return (
     <div className="overflow-x-auto pb-1">
       <div className="inline-flex flex-col gap-0">
-        {/* Day-of-week header */}
         <div className="flex mb-1" style={{ paddingLeft: '0px' }}>
           {DAY_LABELS.map((d) => (
             <div
@@ -171,7 +143,6 @@ function MonthlyView({ data }) {
             </div>
           ))}
         </div>
-        {/* Week rows */}
         {weeks.map((week, rowIdx) => (
           <div key={rowIdx} className="flex items-center gap-0">
             {week.map((cell, colIdx) => {
@@ -211,11 +182,7 @@ function MonthlyView({ data }) {
   )
 }
 
-/**
- * GitHub-style contribution grid (90-day / large ranges).
- * Rows = days of week (Mon=top), columns = weeks (oldest→newest).
- * Month labels rendered above columns.
- */
+/** GitHub-style contribution grid (90-day / large ranges). */
 function GitHubView({ data, dateRange }) {
   const { weeks, maxCount, monthLabels } = useMemo(() => {
     let mx = 0
@@ -228,7 +195,6 @@ function GitHubView({ data, dateRange }) {
     const wks = []
     for (let i = 0; i < cells.length; i += 7) wks.push(cells.slice(i, i + 7))
 
-    // Month labels: label placed at the column where a new month starts
     const labels = []
     let lastMonth = null
     wks.forEach((week, colIdx) => {
@@ -254,7 +220,6 @@ function GitHubView({ data, dateRange }) {
   return (
     <div className="overflow-x-auto pb-1">
       <div className="inline-flex flex-col gap-0">
-        {/* Month labels row */}
         <div className="flex mb-1" style={{ paddingLeft: '28px' }}>
           {weeks.map((_, colIdx) => {
             const monthLabel = monthLabels.find((m) => m.colIdx === colIdx)
@@ -270,7 +235,6 @@ function GitHubView({ data, dateRange }) {
           })}
         </div>
 
-        {/* Day rows */}
         {DAY_LABELS.map((dayLabel, rowIdx) => (
           <div key={rowIdx} className="flex items-center gap-0">
             <span
@@ -317,31 +281,6 @@ function GitHubView({ data, dateRange }) {
   )
 }
 
-/**
- * ActivityHeatmap
- *
- * Dynamically adapts its display mode based on the active date range:
- *   Today / 1-day → hourly blocks (24 columns)
- *   7 days        → daily vertical bars
- *   30 days       → calendar month grid
- *   90 days / any → GitHub-style contribution grid
- *   Custom        → auto-detected from data length
- *
- * Empty state rule (per spec):
- *   Show "No activity" ONLY when activity_logs contains zero events.
- *   Do NOT show empty state if records exist but all daily counts happen to be zero
- *   (e.g. all activity was on a single day so other days show 0).
- *   The correct check is data.length === 0, not data.every(d => d.count === 0).
- *
- * Tooltip (per spec): Date, Contributor Count, Action Count, Top Action.
- *
- * Props:
- *   data      — Array<{ date, count, dayOfWeek, contributors, topAction }>
- *   loading   — boolean
- *   error     — Error | null
- *   onRetry   — () => void
- *   dateRange — { preset, startDate, endDate, label }
- */
 const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetry, dateRange }) => {
   if (loading) return <HeatmapSkeleton />
 
@@ -364,10 +303,6 @@ const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetr
     )
   }
 
-  // ── Empty state: ONLY when zero records exist in activity_logs ─────────────
-  // data.length === 0 means the service returned no log rows at all.
-  // data.every(d => d.count === 0) is intentionally NOT used — that would hide
-  // the heatmap even when logs exist (e.g. sparse activity across many days).
   if (!data || data.length === 0) {
     return (
       <div className="card p-8 flex justify-center">
@@ -386,7 +321,6 @@ const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetr
 
   return (
     <div className="card">
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold text-gray-900 dark:text-white">Activity Heatmap</h3>
@@ -394,7 +328,6 @@ const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetr
             {totalActions.toLocaleString()} action{totalActions !== 1 ? 's' : ''} in {rangeLabel.toLowerCase()}
           </p>
         </div>
-        {/* Legend */}
         <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
           <span>Less</span>
           {COLOR_LEVELS.map((l, i) => (
@@ -408,7 +341,6 @@ const ActivityHeatmap = memo(({ data = [], loading = false, error = null, onRetr
         </div>
       </div>
 
-      {/* Dynamic grid */}
       {mode === 'hourly' && <HourlyView data={data} />}
       {mode === 'daily' && <DailyView data={data} />}
       {mode === 'monthly' && <MonthlyView data={data} />}

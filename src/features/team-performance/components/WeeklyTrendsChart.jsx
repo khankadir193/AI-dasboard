@@ -18,13 +18,7 @@ function SkeletonChart() {
   )
 }
 
-/**
- * Derive a readable subtitle from the date range.
- * Matches the bucketing logic in buildWeeklyTrends (teamPerformanceService).
- *   ≤ 1 day  → "Hourly breakdown"
- *   ≤ 7 days → "Daily breakdown"
- *   > 7 days → "Weekly breakdown"
- */
+/** Derive a readable subtitle from the date range based on bucketing logic. */
 function getSubtitle(dateRange) {
   const start = dateRange?.startDate
   const end = dateRange?.endDate
@@ -39,28 +33,7 @@ function getSubtitle(dateRange) {
   return `Weekly breakdown — ${dateRange?.label ?? 'selected range'}`
 }
 
-/**
- * WeeklyTrendsChart
- *
- * Line chart showing total activity-log actions grouped by time bucket.
- * Bucket granularity is derived by buildWeeklyTrends (teamPerformanceService)
- * based on the selected date range:
- *   ≤ 1 day  → hourly  (label: "HH:00")
- *   ≤ 7 days → daily   (label: "Mon Jun 23")
- *   > 7 days → weekly  (label: "Jun 23")
- *
- * The subtitle adapts to reflect the actual grouping so users understand
- * what each point on the chart represents.
- *
- * Data shape: [{ week, label, count }]
- *
- * Props:
- *   data      — array from buildWeeklyTrends
- *   loading   — boolean
- *   error     — Error | null
- *   onRetry   — () => void
- *   dateRange — { preset, startDate, endDate, label } — used for subtitle
- */
+/** Line chart showing total activity-log actions grouped by time bucket. */
 const WeeklyTrendsChart = memo(({ data = [], loading = false, error = null, onRetry, dateRange }) => {
   if (loading) return <SkeletonChart />
 

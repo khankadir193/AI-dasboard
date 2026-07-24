@@ -17,15 +17,7 @@ function SkeletonChart() {
   )
 }
 
-/**
- * ProjectsPerUserChart
- *
- * Horizontal bar chart showing projects created vs. updated per contributor.
- * Uses recharts (already a project dependency — no new library needed).
- *
- * Data shape (from completionEfficiency array in teamPerformanceService):
- *   [{ name, projectsCreated, projectsUpdated }]
- */
+/** Horizontal bar chart showing projects created vs. updated per contributor. */
 const ProjectsPerUserChart = memo(({ data = [], loading = false, error = null, onRetry }) => {
   if (loading) return <SkeletonChart />
 

@@ -2,9 +2,6 @@ import { memo, useMemo } from 'react'
 import { Users, RotateCcw } from 'lucide-react'
 import EmptyState from '../../../components/common/EmptyState'
 
-/**
- * Skeleton row for loading state — matches the animate-pulse pattern from KPISection.jsx
- */
 function SkeletonRow() {
   return (
     <div className="flex items-center gap-4 py-3 animate-pulse">
@@ -18,28 +15,6 @@ function SkeletonRow() {
   )
 }
 
-/**
- * TopContributorsTable
- *
- * Displays a ranked list of team members by total action count,
- * derived from activity_logs grouped by user. Zero hardcoded rows.
- *
- * Columns: Rank · Member · Actions · Created · Updated · Contribution %
- *
- * Tie handling: two users with the same totalActions receive the same rank number.
- * The next distinct rank skips appropriately (e.g. 1, 2, 2, 4 — not 1, 2, 2, 3).
- * Tie assignment is done in computeTeamActivity (service layer); this component
- * renders the rank value as-is.
- *
- * Contribution %: each user's share of total team actions, pre-computed by
- * computeTeamActivity as `contributionPct`. Displayed with one decimal place.
- *
- * Props:
- *   data      — array from computeTeamActivity (topContributors)
- *   loading   — boolean
- *   error     — Error | null
- *   onRetry   — () => void
- */
 const TopContributorsTable = memo(({ data = [], loading = false, error = null, onRetry }) => {
   if (loading) {
     return (
@@ -120,7 +95,6 @@ const TopContributorsTable = memo(({ data = [], loading = false, error = null, o
                 key={contributor.userId || contributor.rank}
                 className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors"
               >
-                {/* Rank */}
                 <td className="py-3 pr-4">
                   <span className={`
                     inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold
@@ -137,7 +111,6 @@ const TopContributorsTable = memo(({ data = [], loading = false, error = null, o
                   </span>
                 </td>
 
-                {/* Member avatar + name */}
                 <td className="py-3 pr-4">
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-xs font-semibold flex-none">
@@ -149,31 +122,26 @@ const TopContributorsTable = memo(({ data = [], loading = false, error = null, o
                   </div>
                 </td>
 
-                {/* Total actions */}
                 <td className="py-3 pr-4 text-right">
                   <span className="font-semibold text-gray-900 dark:text-white">
                     {contributor.totalActions.toLocaleString()}
                   </span>
                 </td>
 
-                {/* Projects created */}
                 <td className="py-3 pr-4 text-right hidden sm:table-cell">
                   <span className="text-gray-600 dark:text-gray-400">
                     {contributor.projectsCreated}
                   </span>
                 </td>
 
-                {/* Projects updated */}
                 <td className="py-3 pr-4 text-right hidden md:table-cell">
                   <span className="text-gray-600 dark:text-gray-400">
                     {contributor.projectsUpdated}
                   </span>
                 </td>
 
-                {/* Contribution % */}
                 <td className="py-3 text-right hidden lg:table-cell">
                   <div className="flex items-center justify-end gap-2">
-                    {/* Mini progress bar */}
                     <div className="w-16 h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden hidden xl:block">
                       <div
                         className="h-full bg-blue-500 rounded-full"

@@ -2,24 +2,7 @@ import { supabase } from '../../../lib/supabaseClient'
 import { fetchActivityLogs } from '../../../services/activityLogService'
 import { analyticsService } from '../../../services/analyticsService'
 
-/**
- * Aggregates activity logs by user_id into per-user action metrics.
- *
- * Extracted from features/reports/api/generators/teamProductivityReportGenerator.js
- * (private function `computeTeamActivity`) so it can be shared between:
- *   - Team Performance Analytics page  (this feature)
- *   - Reports → Team Productivity generator (re-imports from here)
- *
- * Zero logic change from the original — same Map iteration, same profile lookup.
- * Login tracking intentionally excluded: login/logout are not business actions
- * and should not skew contributor rankings or action counts.
- *
- * Added: contributionPct — each user's share of total team actions (0–100).
- * Used by TopContributorsTable to show a Contribution % column.
- *
- * @param {Array} logs - activity_logs rows (array of log objects)
- * @returns {Promise<Array>} sorted array of contributor objects
- */
+/** Aggregate activity logs by user_id into per-user action metrics. */
 export async function computeTeamActivity(logs) {
   if (!logs || logs.length === 0) return []
 
@@ -35,14 +18,13 @@ export async function computeTeamActivity(logs) {
         totalActions: 0,
         projectsCreated: 0,
         projectsUpdated: 0,
-        activeDays: new Set(), // unique calendar days this user had activity
+        activeDays: new Set(),
       })
     }
 
     const entry = userMap.get(uid)
     entry.totalActions++
 
-    // Track unique active days for actionsPerDay derivation
     const dateStr = log.created_at?.split('T')[0]
     if (dateStr) entry.activeDays.add(dateStr)
 
@@ -72,7 +54,7 @@ export async function computeTeamActivity(logs) {
       .in('id', userIds)
     profiles = data || []
   } catch {
-    // Profile lookup failure is non-fatal — contributor names fall back to 'Team Member'
+    // Fallback to default name if profile lookup fails
   }
 
   const profileMap = {}
@@ -80,16 +62,12 @@ export async function computeTeamActivity(logs) {
     profileMap[p.id] = p.full_name || p.email || 'Unknown'
   })
 
-  // Total actions across all users — needed for contribution %
   const teamTotal = Array.from(userMap.values()).reduce((s, e) => s + e.totalActions, 0)
 
   const sorted = Array.from(userMap.values())
     .sort((a, b) => b.totalActions - a.totalActions)
 
-  // Assign ranks with proper tie handling:
-  // Two users with the same totalActions get the same rank number.
-  // The next distinct rank skips the appropriate number (dense rank not used — matches Jira/Linear convention).
-  let rank = 1
+  let rank = 1 // Handles tie ranking
   return sorted.map((entry, index) => {
     if (index > 0 && sorted[index].totalActions < sorted[index - 1].totalActions) {
       rank = index + 1
@@ -106,35 +84,18 @@ export async function computeTeamActivity(logs) {
       projectsUpdated: entry.projectsUpdated,
       activeDays: entry.activeDays.size,
       contributionPct,
-      contributions: entry.totalActions, // alias kept for report compatibility
+      contributions: entry.totalActions,
     }
   })
 }
 
-/**
- * Groups activity logs into time buckets appropriate for the selected date range.
- *
- * Grouping strategy (aligned with UI heatmap modes):
- *   ≤ 1 day  → hourly  (24 buckets)
- *   ≤ 7 days → daily   (1 bucket per calendar day)
- *   > 7 days → weekly  (ISO Monday-anchored weeks, last N weeks within range)
- *
- * The result is always anchored to the actual startDate/endDate, not "last N
- * weeks from today". This fixes the previous bug where changing the date filter
- * had no effect on the weekly trends chart.
- *
- * @param {Array}  logs      - activity_logs rows
- * @param {string} startDate - YYYY-MM-DD
- * @param {string} endDate   - YYYY-MM-DD
- * @returns {Array<{ week: string, label: string, count: number }>}
- */
+/** Group activity logs into time buckets based on date range. */
 function buildWeeklyTrends(logs, startDate, endDate) {
   const start = new Date(startDate + 'T00:00:00Z')
   const end = new Date(endDate + 'T23:59:59Z')
   const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24))
 
   if (diffDays <= 1) {
-    // ── Hourly buckets (Today / 1-day range) ──────────────────────────────────
     const hourMap = new Array(24).fill(0)
     logs.forEach((log) => {
       const d = new Date(log.created_at)
@@ -148,7 +109,6 @@ function buildWeeklyTrends(logs, startDate, endDate) {
   }
 
   if (diffDays <= 7) {
-    // ── Daily buckets (≤ 7-day range) ────────────────────────────────────────
     const dateMap = new Map()
     logs.forEach((log) => {
       const date = log.created_at?.split('T')[0]
@@ -169,8 +129,7 @@ function buildWeeklyTrends(logs, startDate, endDate) {
     return result
   }
 
-  // ── Weekly buckets (> 7-day range) ───────────────────────────────────────
-  // Snap each log to its ISO Monday, then aggregate into weekly counts.
+  // Snap each log to its ISO Monday
   const weekMap = new Map()
   logs.forEach((log) => {
     const d = new Date(log.created_at)
@@ -186,7 +145,6 @@ function buildWeeklyTrends(logs, startDate, endDate) {
     weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + 1)
   })
 
-  // Generate week slots from startDate through endDate (Monday-anchored)
   const firstMonday = new Date(start)
   const startDow = firstMonday.getUTCDay()
   const backToMon = startDow === 0 ? -6 : 1 - startDow
@@ -207,40 +165,17 @@ function buildWeeklyTrends(logs, startDate, endDate) {
   return result
 }
 
-// Day-of-week label map (0 = Sun)
 const DOW_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-/**
- * Derives all analytics card values from a single pass over the activity_logs array.
- * Zero additional network requests — operates on the batch already fetched for the page.
- *
- * Derived metrics:
- *   - topContributor       — user with most actions
- *   - avgActionsPerUser    — total actions / distinct user count
- *   - weeklyGrowth         — % change between last two trend buckets
- *   - activeMembers        — count of users with ≥1 action
- *   - totalActions         — sum of all business actions in the period
- *   - avgDailyActions      — totalActions / number of distinct active days
- *   - teamEfficiency       — avg actions per active day across all active users
- *   - mostActiveDay        — day-of-week (Mon–Sun) with highest average daily actions
- *   - mostActiveWeek       — trend-bucket label with highest action count
- *   - peakActivityDate     — single calendar date with most actions
- *
- * @param {Array} topContributors - output of computeTeamActivity
- * @param {Array} weeklyTrends    - output of buildWeeklyTrends
- * @param {Array} logs            - raw activity_logs rows
- */
+/** Derive analytics card values from a single pass over activity logs. */
 function computeAnalyticsCards(topContributors, weeklyTrends, logs) {
-  // ── Top Contributor ────────────────────────────────────────────────────────
   const topContributor = topContributors[0]?.name ?? null
 
-  // ── Avg Actions / User ─────────────────────────────────────────────────────
   const totalActions = topContributors.reduce((s, c) => s + c.totalActions, 0)
   const memberCount = topContributors.length
   const avgActionsPerUser =
     memberCount > 0 ? Math.round((totalActions / memberCount) * 10) / 10 : null
 
-  // ── Weekly Growth % ────────────────────────────────────────────────────────
   let weeklyGrowth = null
   if (weeklyTrends.length >= 2) {
     const lastBucket = weeklyTrends[weeklyTrends.length - 1]?.count ?? 0
@@ -248,17 +183,12 @@ function computeAnalyticsCards(topContributors, weeklyTrends, logs) {
     if (prevBucket > 0) {
       weeklyGrowth = Math.round(((lastBucket - prevBucket) / prevBucket) * 100)
     } else if (lastBucket > 0) {
-      weeklyGrowth = 100 // prev was 0, this period had activity → +100%
+      weeklyGrowth = 100
     }
   }
 
-  // ── Active Members ─────────────────────────────────────────────────────────
   const activeMembers = memberCount
 
-  // ── Total Actions ─────────────────────────────────────────────────────────
-  // Exposed so the KPI strip can show "Total Actions" as its own card.
-
-  // ── Avg Daily Actions ─────────────────────────────────────────────────────
   const activeDates = new Set()
   logs.forEach((log) => {
     const date = log.created_at?.split('T')[0]
@@ -267,13 +197,10 @@ function computeAnalyticsCards(topContributors, weeklyTrends, logs) {
   const avgDailyActions =
     activeDates.size > 0 ? Math.round((totalActions / activeDates.size) * 10) / 10 : null
 
-  // ── Team Efficiency ────────────────────────────────────────────────────────
-  // Ratio: total actions / total active days across all users.
   const totalActiveDays = topContributors.reduce((s, c) => s + c.activeDays, 0)
   const teamEfficiency =
     totalActiveDays > 0 ? Math.round((totalActions / totalActiveDays) * 10) / 10 : null
 
-  // ── Most Active Day (day-of-week) ──────────────────────────────────────────
   const dowCounts = new Array(7).fill(0)
   logs.forEach((log) => {
     const d = new Date(log.created_at)
@@ -290,7 +217,6 @@ function computeAnalyticsCards(topContributors, weeklyTrends, logs) {
   const mostActiveDay =
     mostActiveDow !== null && mostActiveDowCount > 0 ? DOW_LABELS[mostActiveDow] : null
 
-  // ── Most Active Week ───────────────────────────────────────────────────────
   let mostActiveWeek = null
   let mostActiveWeekCount = 0
   weeklyTrends.forEach((w) => {
@@ -300,7 +226,6 @@ function computeAnalyticsCards(topContributors, weeklyTrends, logs) {
     }
   })
 
-  // ── Peak Activity Date ─────────────────────────────────────────────────────
   const dateCounts = new Map()
   logs.forEach((log) => {
     const date = log.created_at?.split('T')[0]
@@ -337,27 +262,11 @@ function computeAnalyticsCards(topContributors, weeklyTrends, logs) {
   }
 }
 
-/**
- * Groups pre-fetched activity_logs into per-day heatmap cells for the selected range.
- *
- * Called internally by fetchTeamPerformanceData to derive heatmap data from the
- * SAME logs batch — avoiding a second Supabase round-trip. The result is returned
- * alongside topContributors and weeklyTrends in the single combined query.
- *
- * Cell shape: { date, count, dayOfWeek, contributors, topAction }
- *   - contributors: number of distinct users active on that day
- *   - topAction:    the most-common action type on that day (for tooltip)
- *
- * @param {Array}  logs      - activity_logs rows already fetched
- * @param {string} startDate - YYYY-MM-DD
- * @param {string} endDate   - YYYY-MM-DD
- * @returns {Array<{ date, count, dayOfWeek, contributors, topAction }>}
- */
+/** Group activity logs into per-day heatmap cells. */
 export function buildHeatmapDays(logs, startDate, endDate) {
   if (!startDate || !endDate) return []
 
-  // Build per-day aggregation
-  const dayMap = new Map() // date → { count, users: Set, actions: Map<action,count> }
+  const dayMap = new Map()
 
   logs.forEach((log) => {
     const date = log.created_at?.split('T')[0]
@@ -374,7 +283,6 @@ export function buildHeatmapDays(logs, startDate, endDate) {
     }
   })
 
-  // Resolve topAction per day (action with highest count)
   const getTopAction = (actionMap) => {
     let top = null
     let topCount = 0
@@ -384,13 +292,11 @@ export function buildHeatmapDays(logs, startDate, endDate) {
         top = action
       }
     })
-    // Format for display: 'project_create' → 'Project Create'
     return top
       ? top.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
       : null
   }
 
-  // Fill contiguous day range (zero-count days included for grid completeness)
   const days = []
   const [sy, sm, sd] = startDate.split('-').map(Number)
   const [ey, em, ed] = endDate.split('-').map(Number)
@@ -403,7 +309,7 @@ export function buildHeatmapDays(logs, startDate, endDate) {
     days.push({
       date: dateStr,
       count: entry?.count || 0,
-      dayOfWeek: cursor.getUTCDay(), // 0 = Sun, 6 = Sat
+      dayOfWeek: cursor.getUTCDay(),
       contributors: entry?.users.size || 0,
       topAction: entry ? getTopAction(entry.actions) : null,
     })
@@ -413,18 +319,7 @@ export function buildHeatmapDays(logs, startDate, endDate) {
   return days
 }
 
-/**
- * Fetches all data needed for the Team Performance Analytics page.
- *
- * Single Supabase round-trip — all derived metrics (topContributors, weeklyTrends,
- * completionEfficiency, heatmapDays, analyticsCards) are computed from ONE logs batch.
- *
- * Eliminates the previous duplicate fetch pattern where ActivityHeatmap called
- * fetchActivityLogs independently for the same company/date range.
- *
- * @param {{ companyId: string, startDate: string, endDate: string }} params
- * @returns {Promise<Object>}
- */
+/** Fetch all team performance data for the given company and date range. */
 export async function fetchTeamPerformanceData({ companyId, startDate, endDate }) {
   if (!companyId) {
     return {
@@ -447,16 +342,10 @@ export async function fetchTeamPerformanceData({ companyId, startDate, endDate }
 
   const logs = activityLogsResult?.logs || []
 
-  // All derived data from the same logs batch — zero additional queries
   const topContributors = await computeTeamActivity(logs)
-
-  // Weekly trends now respect the actual date range (not always "last 12 weeks from today")
   const weeklyTrends = buildWeeklyTrends(logs, startDate, endDate)
-
-  // Heatmap derived from same logs batch — eliminates the second Supabase fetch
   const heatmapDays = buildHeatmapDays(logs, startDate, endDate)
 
-  // Completion efficiency: per-contributor project action ratio
   const totalProjects = projectStatusData.reduce((sum, s) => sum + (s.value || 0), 0)
   const activeEntry = projectStatusData.find(
     (s) => s.name?.toLowerCase() === 'active'
@@ -474,7 +363,7 @@ export async function fetchTeamPerformanceData({ companyId, startDate, endDate }
       c.projectsUpdated > 0
         ? Math.round((c.projectsCreated / c.projectsUpdated) * 10) / 10
         : c.projectsCreated > 0
-          ? null // updated=0, can't form a ratio — treat as "all created"
+          ? null
           : 0
     return {
       name: c.name,
@@ -489,7 +378,6 @@ export async function fetchTeamPerformanceData({ companyId, startDate, endDate }
     }
   })
 
-  // All analytics cards — pure derivation from already-loaded data, zero network calls
   const analyticsCards = computeAnalyticsCards(topContributors, weeklyTrends, logs)
 
   return {

@@ -50,7 +50,6 @@ export async function generateReport({ companyId, type, title, userId }) {
   if (error) throw error
   if (!data) throw new Error('Failed to save report')
 
-  // Business-event log: REPORT_GENERATE (fire-and-forget — non-blocking)
   logActivity({
     companyId,
     userId: userId || null,

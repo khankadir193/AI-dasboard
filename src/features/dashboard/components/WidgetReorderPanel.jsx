@@ -3,13 +3,7 @@ import { GripVertical, Eye, EyeOff, RotateCcw, X } from 'lucide-react'
 import ToggleSwitch from '../../../components/ui/ToggleSwitch'
 import { DEFAULT_WIDGET_ORDER } from '../services/dashboardPreferencesService'
 
-/**
- * Widget definitions for the reorder panel.
- * slotId  — the ID stored in widget_order (orderable unit)
- * widgetId — the ID stored in hidden_widgets (individual hide/show)
- * label   — display name shown in the panel
- * isChild — true if this widget is a sub-item of a slot (not independently orderable)
- */
+/** Widget definitions for the reorder panel. */
 const WIDGET_DEFS = [
   { slotId: 'kpi_section', widgetId: 'kpi_section', label: 'KPI Section', isChild: false },
   {
@@ -23,25 +17,7 @@ const WIDGET_DEFS = [
   { slotId: 'recent_activity_feed', widgetId: 'recent_activity_feed', label: 'Recent Activity Feed', isChild: false },
 ]
 
-/**
- * WidgetReorderPanel
- *
- * Slide-in panel for managing dashboard widget visibility and order.
- * - Drag-to-reorder via HTML5 native draggable (no external DnD library).
- *   Justification: the list has 4 orderable slots — native drag is fully
- *   sufficient and avoids adding @dnd-kit, react-beautiful-dnd, etc.
- * - Individual child widgets (activity_timeline, project_status) can be
- *   independently hidden within the charts_row slot.
- * - "Reset to defaults" restores DEFAULT_WIDGET_ORDER + clears hidden list.
- *
- * Props:
- *   widgetOrder    — current string[] from useDashboardPreferences
- *   hiddenWidgets  — current string[] from useDashboardPreferences
- *   isSaving       — boolean (mutation in flight)
- *   onUpdate       — (newOrder: string[], newHidden: string[]) => void
- *   onReset        — () => void
- *   onClose        — () => void
- */
+/** Slide-in panel for managing dashboard widget visibility and order. */
 export default function WidgetReorderPanel({
   widgetOrder,
   hiddenWidgets,
@@ -50,14 +26,12 @@ export default function WidgetReorderPanel({
   onReset,
   onClose,
 }) {
-  // Local order state (list of slotIds in user's sequence)
   const [localOrder, setLocalOrder] = useState(() => widgetOrder ?? DEFAULT_WIDGET_ORDER)
   const [localHidden, setLocalHidden] = useState(() => hiddenWidgets ?? [])
 
   const dragSlot = useRef(null)
   const dragOverSlot = useRef(null)
 
-  // ── Drag handlers (HTML5 native) ──────────────────────────────────────────
   const handleDragStart = useCallback((slotId) => {
     dragSlot.current = slotId
   }, [])
@@ -79,7 +53,6 @@ export default function WidgetReorderPanel({
     dragOverSlot.current = null
   }, [localOrder])
 
-  // ── Visibility toggles ────────────────────────────────────────────────────
   const toggleWidget = useCallback((widgetId) => {
     setLocalHidden((prev) =>
       prev.includes(widgetId)
@@ -88,7 +61,6 @@ export default function WidgetReorderPanel({
     )
   }, [])
 
-  // ── Save / Reset ──────────────────────────────────────────────────────────
   const handleSave = () => onUpdate(localOrder, localHidden)
 
   const handleReset = () => {
@@ -99,20 +71,17 @@ export default function WidgetReorderPanel({
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/30 z-40 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Panel */}
       <div
         role="dialog"
         aria-label="Customize dashboard layout"
         className="fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 shadow-2xl z-50 flex flex-col"
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -131,7 +100,6 @@ export default function WidgetReorderPanel({
           </button>
         </div>
 
-        {/* Widget list */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
           {localOrder.map((slotId) => {
             const def = WIDGET_DEFS.find((d) => d.slotId === slotId)
@@ -150,7 +118,6 @@ export default function WidgetReorderPanel({
                 onDragOver={(e) => e.preventDefault()}
                 className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden select-none cursor-grab active:cursor-grabbing"
               >
-                {/* Slot row */}
                 <div className="flex items-center gap-3 px-3 py-3">
                   <GripVertical
                     size={15}
@@ -165,7 +132,6 @@ export default function WidgetReorderPanel({
                   >
                     {def.label}
                   </span>
-                  {/* Toggle for non-compound slots */}
                   {def.widgetId && (
                     <ToggleSwitch
                       checked={!isSlotHidden}
@@ -173,7 +139,6 @@ export default function WidgetReorderPanel({
                       label={`Toggle ${def.label}`}
                     />
                   )}
-                  {/* Visibility icon for compound slots (no slot-level toggle) */}
                   {!def.widgetId && (
                     <span title="Manage sub-widgets below">
                       {def.children?.some((c) => !localHidden.includes(c.widgetId)) ? (
@@ -185,7 +150,6 @@ export default function WidgetReorderPanel({
                   )}
                 </div>
 
-                {/* Child widgets (only for charts_row) */}
                 {def.children && (
                   <div className="border-t border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/60">
                     {def.children.map((child) => {
@@ -219,7 +183,6 @@ export default function WidgetReorderPanel({
           })}
         </div>
 
-        {/* Footer actions */}
         <div className="flex items-center gap-2 px-4 py-4 border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={handleReset}

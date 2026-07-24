@@ -18,9 +18,7 @@ function SkeletonChart() {
   )
 }
 
-/**
- * Custom tooltip showing total actions alongside the ratio.
- */
+/** Custom tooltip showing total actions alongside the ratio. */
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   const d = payload[0]?.payload || {}
@@ -40,15 +38,7 @@ function CustomTooltip({ active, payload, label }) {
   )
 }
 
-/**
- * CompletionEfficiencyChart
- *
- * Bar chart of total actions per top contributor, color-graded by contribution level.
- * Provides a quick visual of who is most active and their project engagement breakdown.
- *
- * Data shape (from completionEfficiency in teamPerformanceService):
- *   [{ name, totalActions, projectsCreated, projectsUpdated, activeRatio }]
- */
+/** Bar chart of total actions per top contributor, color-graded by contribution level. */
 const CompletionEfficiencyChart = memo(({ data = [], loading = false, error = null, onRetry }) => {
   if (loading) return <SkeletonChart />
 
@@ -85,7 +75,6 @@ const CompletionEfficiencyChart = memo(({ data = [], loading = false, error = nu
     )
   }
 
-  // Color scale: gradient from blue-300 to blue-700 relative to max actions
   const maxActions = Math.max(...data.map((d) => d.totalActions), 1)
   const getColor = (totalActions) => {
     const ratio = totalActions / maxActions
