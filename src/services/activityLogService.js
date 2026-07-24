@@ -1,16 +1,31 @@
 import { supabase } from '../lib/supabaseClient'
 
+/**
+ * Business-event action constants for activity_logs.
+ *
+ * Deliberately excludes: LOGIN, LOGOUT, DASHBOARD_VIEW, PAGE_VISIT, NAVIGATION.
+ * These are infrastructure/session events, not business actions.
+ * If audit-trail logging for auth events is needed, use a dedicated
+ * security_audit_log table rather than polluting business analytics.
+ */
 export const ACTIONS = {
-  LOGIN: 'login',
-  LOGOUT: 'logout',
-  DASHBOARD_VIEW: 'dashboard_view',
+  // Projects
   PROJECT_CREATE: 'project_create',
   PROJECT_UPDATE: 'project_update',
   PROJECT_DELETE: 'project_delete',
+  // Invitations
   INVITE_SEND: 'invite_send',
   INVITE_ACCEPT: 'invite_accept',
+  // Members
+  MEMBER_ADD: 'member_add',
+  MEMBER_REMOVE: 'member_remove',
+  // Roles & Settings
   ROLE_UPDATE: 'role_update',
   SETTINGS_CHANGE: 'settings_change',
+  // Reports
+  REPORT_GENERATE: 'report_generate',
+  // AI Insights
+  AI_INSIGHT: 'ai_insight',
 }
 
 export const RESOURCE_TYPES = {
@@ -18,8 +33,9 @@ export const RESOURCE_TYPES = {
   USER: 'user',
   INVITE: 'invite',
   SETTINGS: 'settings',
-  DASHBOARD: 'dashboard',
-  AUTH: 'auth',
+  REPORT: 'report',
+  AI: 'ai',
+  MEMBER: 'member',
 }
 
 const recentLogs = new Map()
@@ -98,7 +114,12 @@ export async function fetchActivityLogs({ companyId, page = 1, pageSize = 20, ac
     if (action) query = query.eq('action', action)
     if (resourceType) query = query.eq('resource_type', resourceType)
     if (startDate) query = query.gte('created_at', startDate)
-    if (endDate) query = query.lte('created_at', endDate)
+    // Append end-of-day so the full calendar day is included (critical for the
+    // "Today" preset which passes a bare YYYY-MM-DD date string).
+    if (endDate) {
+      const endOfDay = endDate.includes('T') ? endDate : `${endDate}T23:59:59.999Z`
+      query = query.lte('created_at', endOfDay)
+    }
     if (search && search.trim()) query = query.ilike('description', `%${search.trim()}%`)
 
     const { data, error, count } = await query

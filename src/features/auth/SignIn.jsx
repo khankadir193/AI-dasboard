@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { trackEvent } from '../analytics/trackEvent'
-import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
 
 
 export default function SignIn() {
@@ -62,14 +61,8 @@ export default function SignIn() {
         type: 'active_users',
         value: 1
       })
-      logActivity({
-        companyId: signInProfile.company_id,
-        userId: signInProfile.id,
-        action: ACTIONS.LOGIN,
-        resourceType: RESOURCE_TYPES.AUTH,
-        description: 'User logged in',
-        metadata: { role: signInProfile.role }
-      })
+      // Login/logout events are tracked in analytics_data via trackEvent() above.
+      // They are NOT logged to activity_logs (login is not a business action).
     }
 
     const redirectParam = new URLSearchParams(location.search).get('redirect')

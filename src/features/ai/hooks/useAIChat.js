@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiService } from '../../../services/apiService';
 import { sendPromptToAI } from '../services/aiChatService';
 import { buildFirstPromptTitle, makeId } from '../utils/chatHelpers';
+import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../../services/activityLogService';
 
 export default function useAIChat({
     activeConversationId,
@@ -199,6 +200,24 @@ export default function useAIChat({
                     });
                 } catch {
                     // ignore to preserve UI
+                }
+
+                // Business-event log: AI_INSIGHT (fire-and-forget — non-blocking)
+                if (companyId) {
+                    try {
+                        const user = await apiService.getSupabaseUser();
+                        logActivity({
+                            companyId,
+                            userId: user?.id || null,
+                            action: ACTIONS.AI_INSIGHT,
+                            resourceType: RESOURCE_TYPES.AI,
+                            resourceId: activeConversationIdLocal || null,
+                            description: 'AI insight generated',
+                            metadata: { promptSnippet: prompt.slice(0, 120) }
+                        })
+                    } catch {
+                        // ignore — activity log failure must never surface to user
+                    }
                 }
 
                 // Update conversation timestamp after exchange (best-effort)

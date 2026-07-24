@@ -19,22 +19,56 @@ function SkeletonChart() {
 }
 
 /**
+ * Derive a readable subtitle from the date range.
+ * Matches the bucketing logic in buildWeeklyTrends (teamPerformanceService).
+ *   ≤ 1 day  → "Hourly breakdown"
+ *   ≤ 7 days → "Daily breakdown"
+ *   > 7 days → "Weekly breakdown"
+ */
+function getSubtitle(dateRange) {
+  const start = dateRange?.startDate
+  const end = dateRange?.endDate
+  if (!start || !end) return 'Activity over time'
+
+  const diffDays = Math.round(
+    (new Date(end + 'T00:00:00Z') - new Date(start + 'T00:00:00Z')) / (1000 * 60 * 60 * 24)
+  )
+
+  if (diffDays <= 1) return `Hourly breakdown — ${dateRange?.label ?? 'today'}`
+  if (diffDays <= 7) return `Daily breakdown — ${dateRange?.label ?? 'last 7 days'}`
+  return `Weekly breakdown — ${dateRange?.label ?? 'selected range'}`
+}
+
+/**
  * WeeklyTrendsChart
  *
- * Line chart showing total activity-log actions per ISO week for the last 12 weeks.
- * The week labels are derived from buildWeeklyTrends in teamPerformanceService —
- * formatted as "Jun 23", "Jun 30", etc. (Monday-start of each week).
+ * Line chart showing total activity-log actions grouped by time bucket.
+ * Bucket granularity is derived by buildWeeklyTrends (teamPerformanceService)
+ * based on the selected date range:
+ *   ≤ 1 day  → hourly  (label: "HH:00")
+ *   ≤ 7 days → daily   (label: "Mon Jun 23")
+ *   > 7 days → weekly  (label: "Jun 23")
+ *
+ * The subtitle adapts to reflect the actual grouping so users understand
+ * what each point on the chart represents.
  *
  * Data shape: [{ week, label, count }]
+ *
+ * Props:
+ *   data      — array from buildWeeklyTrends
+ *   loading   — boolean
+ *   error     — Error | null
+ *   onRetry   — () => void
+ *   dateRange — { preset, startDate, endDate, label } — used for subtitle
  */
-const WeeklyTrendsChart = memo(({ data = [], loading = false, error = null, onRetry }) => {
+const WeeklyTrendsChart = memo(({ data = [], loading = false, error = null, onRetry, dateRange }) => {
   if (loading) return <SkeletonChart />
 
   if (error) {
     return (
       <div className="card p-6 text-center">
         <p className="text-red-600 dark:text-red-400 mb-3 text-sm">
-          Failed to load weekly trends
+          Failed to load activity trends
         </p>
         {onRetry && (
           <button
@@ -56,8 +90,8 @@ const WeeklyTrendsChart = memo(({ data = [], loading = false, error = null, onRe
       <div className="card p-8 flex justify-center">
         <EmptyState
           icon={TrendingUp}
-          title="No weekly activity yet"
-          description="Weekly trends will appear once the team starts logging actions."
+          title="No activity yet"
+          description="Activity trends will appear once the team starts logging actions."
         />
       </div>
     )
@@ -68,17 +102,19 @@ const WeeklyTrendsChart = memo(({ data = [], loading = false, error = null, onRe
     data.reduce((sum, d) => sum + (d.count || 0), 0) / Math.max(data.length, 1)
   )
 
+  const subtitle = getSubtitle(dateRange)
+
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-gray-900 dark:text-white">Weekly Activity Trends</h3>
+          <h3 className="font-semibold text-gray-900 dark:text-white">Activity Trends</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Total actions per week — last 12 weeks
+            {subtitle}
           </p>
         </div>
         <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-          avg {avg}/wk
+          avg {avg}/period
         </span>
       </div>
 
@@ -115,7 +151,7 @@ const WeeklyTrendsChart = memo(({ data = [], loading = false, error = null, onRe
               fontSize: '12px',
             }}
             formatter={(value) => [value, 'Actions']}
-            labelFormatter={(label) => `Week of ${label}`}
+            labelFormatter={(label) => `Period: ${label}`}
           />
           {avg > 0 && (
             <ReferenceLine

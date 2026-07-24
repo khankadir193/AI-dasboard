@@ -4,6 +4,8 @@ import { generateWeeklyReport } from './generators/weeklyReportGenerator'
 import { generateMonthlyReport } from './generators/monthlyReportGenerator'
 import { generateTeamProductivityReport } from './generators/teamProductivityReportGenerator'
 import { generateExecutiveSummaryReport } from './generators/executiveSummaryReportGenerator'
+import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../../services/activityLogService'
+
 
 export async function generateReport({ companyId, type, title, userId }) {
   if (!companyId) throw new Error('company_id is required')
@@ -47,6 +49,17 @@ export async function generateReport({ companyId, type, title, userId }) {
 
   if (error) throw error
   if (!data) throw new Error('Failed to save report')
+
+  // Business-event log: REPORT_GENERATE (fire-and-forget — non-blocking)
+  logActivity({
+    companyId,
+    userId: userId || null,
+    action: ACTIONS.REPORT_GENERATE,
+    resourceType: RESOURCE_TYPES.REPORT,
+    resourceId: data.id,
+    description: `${reportTitle} report generated`,
+    metadata: { reportType: type, reportTitle }
+  })
 
   return data
 }

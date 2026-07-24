@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
+import { logActivity, ACTIONS, RESOURCE_TYPES } from './activityLogService'
 
 const ALLOWED_ROLES = new Set(['admin', 'manager', 'analyst', 'viewer'])
 const ALLOWED_STATUSES = new Set(['active', 'inactive', 'removed'])
@@ -189,6 +190,17 @@ export const updateUserRole = async ({ userId, role, companyId }) => {
     throw profileErr
   }
 
+  // Business-event log: ROLE_UPDATE (fire-and-forget — non-blocking)
+  logActivity({
+    companyId: targetCompanyId,
+    userId: ctx.myProfile.id,
+    action: ACTIONS.ROLE_UPDATE,
+    resourceType: RESOURCE_TYPES.MEMBER,
+    resourceId: userId,
+    description: `Role updated to ${normalizedRole} for user ${userId}`,
+    metadata: { targetUserId: userId, previousRole: member.role, newRole: normalizedRole }
+  })
+
   return { id: userId, role: normalizedRole, membership_status: member.status }
 }
 
@@ -286,6 +298,17 @@ export const removeMember = async ({ userId, companyId }) => {
     await supabase.from('company_members').update({ status: member.status }).eq('id', member.id)
     throw profileErr
   }
+
+  // Business-event log: MEMBER_REMOVE (fire-and-forget — non-blocking)
+  logActivity({
+    companyId: targetCompanyId,
+    userId: ctx.myProfile.id,
+    action: ACTIONS.MEMBER_REMOVE,
+    resourceType: RESOURCE_TYPES.MEMBER,
+    resourceId: userId,
+    description: `Member ${userId} removed from company`,
+    metadata: { targetUserId: userId }
+  })
 
   return { id: userId, removed: true }
 }

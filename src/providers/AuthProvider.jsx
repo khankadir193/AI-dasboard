@@ -7,7 +7,6 @@ import { clearProfile, fetchUserProfile } from '../store/slices/profileSlice'
 import { clearTenant } from '../store/slices/tenantSlice'
 import { clearProjects } from '../store/slices/projectsSlice'
 import FullScreenLoader from '../components/common/FullScreenLoader'
-import { logActivity, ACTIONS, RESOURCE_TYPES } from '../services/activityLogService'
 import { ensureFeatureFlags } from '../services/featureFlagService'
 
 const AUTH_REQUEST_TIMEOUT_MS = 8000
@@ -167,13 +166,9 @@ export default function AuthProvider({ children }) {
             profileRetryTimerRef.current = null
           }
           if (cid) {
-            logActivity({
-              companyId: cid,
-              userId: uid,
-              action: ACTIONS.LOGOUT,
-              resourceType: RESOURCE_TYPES.AUTH,
-              description: 'User logged out'
-            })
+            // Logout is a session/auth event, not a business action.
+            // It is deliberately NOT logged to activity_logs per product spec.
+            // If security audit logging is required, add a separate security_audit_log table.
           }
           void clearSessionState()
           return

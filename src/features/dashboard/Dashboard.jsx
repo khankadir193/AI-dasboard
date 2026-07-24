@@ -17,7 +17,6 @@ import RecentActivityFeed from './components/ActivityFeed/RecentActivityFeed'
 import WidgetReorderPanel from './components/WidgetReorderPanel'
 import DateRangeFilter from '../../components/common/DateRangeFilter'
 import { trackEvent } from '../analytics/trackEvent'
-import { logActivity, ACTIONS, RESOURCE_TYPES } from '../../services/activityLogService'
 import FeatureGate from '../../components/auth/FeatureGate'
 
 // Module-level set persists across StrictMode unmount/remount to prevent duplicate tracking
@@ -89,6 +88,8 @@ function DashboardContent() {
       trackedViewKeys.clear()
     }
 
+    // Write to analytics_data only (powers Analytics page KPI counters).
+    // Dashboard views are NOT logged to activity_logs per product spec.
     trackEvent({
       companyId: profile.company_id,
       type: 'dashboard_view',
@@ -96,14 +97,6 @@ function DashboardContent() {
     }).then(() => {
       queryClient.invalidateQueries({ queryKey: ['dashboardAnalytics', profile.company_id] })
       queryClient.invalidateQueries({ queryKey: ['recentActivity', profile.company_id] })
-    })
-
-    logActivity({
-      companyId: profile.company_id,
-      userId: profile.id,
-      action: ACTIONS.DASHBOARD_VIEW,
-      resourceType: RESOURCE_TYPES.DASHBOARD,
-      description: 'Dashboard viewed'
     })
   }, [profile?.company_id, locationKey])
 

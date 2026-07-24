@@ -6,9 +6,9 @@ import { ACTIONS } from '../../services/activityLogService'
 import FeatureGate from '../../components/auth/FeatureGate'
 
 const ACTION_LABELS = {
-  [ACTIONS.LOGIN]: 'Login',
-  [ACTIONS.LOGOUT]: 'Logout',
-  [ACTIONS.DASHBOARD_VIEW]: 'Dashboard View',
+  // Auth events removed from activity_logs per spec — login/logout are session events.
+  // Rows written before this change will fall back to the raw action string via ACTION_LABELS[action] || action.
+  // Business actions:
   [ACTIONS.PROJECT_CREATE]: 'Project Created',
   [ACTIONS.PROJECT_UPDATE]: 'Project Updated',
   [ACTIONS.PROJECT_DELETE]: 'Project Deleted',
@@ -16,12 +16,13 @@ const ACTION_LABELS = {
   [ACTIONS.INVITE_ACCEPT]: 'Invite Accepted',
   [ACTIONS.ROLE_UPDATE]: 'Role Updated',
   [ACTIONS.SETTINGS_CHANGE]: 'Settings Changed',
+  [ACTIONS.REPORT_GENERATE]: 'Report Generated',
+  [ACTIONS.AI_INSIGHT]: 'AI Insight Generated',
+  [ACTIONS.MEMBER_ADD]: 'Member Added',
+  [ACTIONS.MEMBER_REMOVE]: 'Member Removed',
 }
 
 const ACTION_COLORS = {
-  [ACTIONS.LOGIN]: 'text-green-600 dark:text-green-400',
-  [ACTIONS.LOGOUT]: 'text-gray-600 dark:text-gray-400',
-  [ACTIONS.DASHBOARD_VIEW]: 'text-purple-600 dark:text-purple-400',
   [ACTIONS.PROJECT_CREATE]: 'text-green-600 dark:text-green-400',
   [ACTIONS.PROJECT_UPDATE]: 'text-orange-600 dark:text-orange-400',
   [ACTIONS.PROJECT_DELETE]: 'text-red-600 dark:text-red-400',
@@ -29,6 +30,10 @@ const ACTION_COLORS = {
   [ACTIONS.INVITE_ACCEPT]: 'text-teal-600 dark:text-teal-400',
   [ACTIONS.ROLE_UPDATE]: 'text-yellow-600 dark:text-yellow-400',
   [ACTIONS.SETTINGS_CHANGE]: 'text-indigo-600 dark:text-indigo-400',
+  [ACTIONS.REPORT_GENERATE]: 'text-purple-600 dark:text-purple-400',
+  [ACTIONS.AI_INSIGHT]: 'text-violet-600 dark:text-violet-400',
+  [ACTIONS.MEMBER_ADD]: 'text-emerald-600 dark:text-emerald-400',
+  [ACTIONS.MEMBER_REMOVE]: 'text-rose-600 dark:text-rose-400',
 }
 
 function AuditLogsContent() {

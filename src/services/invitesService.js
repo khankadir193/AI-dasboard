@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { createNotification } from './notificationsService'
+import { logActivity, ACTIONS, RESOURCE_TYPES } from './activityLogService'
 
 const ALLOWED_ROLES = new Set(['admin', 'manager', 'analyst', 'viewer'])
 
@@ -202,6 +203,17 @@ export const createInvite = async ({ email, role, companyId }) => {
     resourceId: data.id,
     metadata: { email: normalizedEmail, role: normalizedRole }
   }).catch(err => console.error('[invitesService] createNotification failed:', err))
+
+  // Business-event log: INVITE_SEND (fire-and-forget — non-blocking)
+  logActivity({
+    companyId,
+    userId: user.id,
+    action: ACTIONS.INVITE_SEND,
+    resourceType: RESOURCE_TYPES.INVITE,
+    resourceId: data.id,
+    description: `Invitation sent to ${normalizedEmail} with role ${normalizedRole}`,
+    metadata: { email: normalizedEmail, role: normalizedRole }
+  })
 
   return toPendingRowShape(data)
 }

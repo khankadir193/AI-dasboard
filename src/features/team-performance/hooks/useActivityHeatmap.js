@@ -3,17 +3,14 @@ import { useSelector } from 'react-redux'
 import { fetchHeatmapData } from '../services/activityHeatmapService'
 
 /**
- * Fetches activity heatmap data for the current user's company and the
- * selected date range.
+ * Hook kept for standalone / independent heatmap use cases.
  *
- * Cache key includes companyId + startDate + endDate so different ranges
- * cache independently — switching filters causes a real refetch.
+ * In TeamPerformancePage, this hook is NOT called — heatmap data is derived
+ * from the `useTeamPerformance` result (`data.heatmapDays`) to avoid making
+ * a second Supabase request for the same activity_logs data.
  *
- * staleTime: 10 minutes — heatmap data changes slowly within a fixed
- * historical window; aggressive refetching adds unnecessary load.
- *
- * refetchOnWindowFocus: false — heatmap is historical; no need to
- * re-query when the user switches browser tabs.
+ * This hook remains available for future pages or widgets that need only the
+ * heatmap without the full team performance analytics suite.
  *
  * @param {{ startDate: string, endDate: string }} dateRange
  */
@@ -32,4 +29,3 @@ export function useActivityHeatmap(dateRange) {
     refetchOnWindowFocus: false,
   })
 }
-

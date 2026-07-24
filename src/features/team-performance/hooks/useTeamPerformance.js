@@ -3,15 +3,22 @@ import { useSelector } from 'react-redux'
 import { fetchTeamPerformanceData } from '../services/teamPerformanceService'
 
 /**
- * Fetches team performance analytics scoped to the current user's company.
+ * Fetches all team performance analytics for the current company and date range.
  *
- * Cache key includes companyId + date range to prevent cross-company collisions
- * and to invalidate correctly when the user changes the DateRangeFilter.
+ * Single Supabase round-trip — the query result now includes `heatmapDays`
+ * derived from the same logs batch. This eliminates the duplicate fetch that
+ * useActivityHeatmap previously made independently for the same data.
  *
- * staleTime: 5 minutes — matches useRecentActivity (same underlying data source:
- * activity_logs + projects). Not a live feed; occasional staleness is acceptable.
+ * The TeamPerformancePage consumes `data.heatmapDays` directly and passes it
+ * to <ActivityHeatmap> — no second hook call needed.
  *
- * @param {{ startDate: string, endDate: string }} dateRange
+ * Cache key: ['teamPerformance', companyId, startDate, endDate]
+ * Changing the date filter causes a real refetch (different cache entry).
+ *
+ * staleTime: 5 minutes — matches analytics data freshness expectations.
+ * Not a live feed; occasional staleness is acceptable.
+ *
+ * @param {{ startDate: string, endDate: string, preset?: string, label?: string }} dateRange
  */
 export function useTeamPerformance(dateRange) {
   const { profile } = useSelector((state) => state.profile)
